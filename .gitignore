@@ -33,3 +33,11 @@
 
 # ctags
 .tags*
+
+# Binaries
+ODR_cse533-14
+client_cse533-14
+server_cse533-14
+ODR_cse533-12
+client_cse533-12
+server_cse533-12

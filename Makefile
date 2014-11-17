@@ -16,7 +16,7 @@ server_%: server.o
 client_%: client.o
 	$(CC) $(LDFLAGS) -o $@ $<
 
-%.o: %.c %.h
+%.o: %.c %.h common.h
 	$(CC) $(CFLAGS) -c $<
 
 clean:
