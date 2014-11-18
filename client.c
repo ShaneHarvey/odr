@@ -139,11 +139,11 @@ int run(int sock_fd) {
                                     FD_SET(sock_fd, &rset);
                                     select(sock_fd + 1, &rset, NULL, NULL, &tv);
                                     if(FD_ISSET(sock_fd, &rset)) {
-                                        char receieved_ip[BUFFER_SIZE];
+                                        char received_ip[BUFFER_SIZE];
                                         char received_msg[BUFFER_SIZE];
                                         int received_port = 0, bytes = 0;
                                         if((bytes = msg_recv(sock_fd, received_msg, sizeof(received_msg),
-                                                receieved_ip, sizeof(receieved_ip), &received_port)) > 0) {
+                                                received_ip, sizeof(received_ip), &received_port)) > 0) {
                                             info("client at node %s : received from %s <%s>", this_vm, vm, received_msg);
                                             // Exit the dowhile loop
                                             break;
