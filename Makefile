@@ -1,26 +1,33 @@
-CC=gcc
-CFLAGS=-g -Wall -Werror -pedantic
-LDFLAGS=
+CC = gcc
+FLAGS = -g -O2 -Wall -Werror -std=gnu89 -DCOLOR
+LIB = libapi.a
+LIBS = $(LIB)
+
 USER=cse533-14
 TMP=ODR server client
 BINS=$(TMP:=_$(USER))
 
-all: $(BINS)
+TARGETS = $(LIB) $(BINS)
+
+all: $(TARGETS)
+
+$(LIB): api.o api.h
+	ar -cvq $(LIB) $<
 
 ODR_%: ODR.o
-	$(CC) $(LDFLAGS) -o $@ $<
+	$(CC) -o $@ $< $(LIBS)
 
 server_%: server.o
-	$(CC) $(LDFLAGS) -o $@ $<
+	$(CC) -o $@ $< $(LIBS)
 
 client_%: client.o
-	$(CC) $(LDFLAGS) -o $@ $<
+	$(CC) -o $@ $< $(LIBS)
 
 %.o: %.c %.h common.h
-	$(CC) $(CFLAGS) -c $<
+	$(CC) $(FLAGS) -c $<
 
 clean:
-	rm -f *.o $(BINS)
+	rm -f *.o $(TARGETS)
 
 PHONY: all clean
 SECONDARY: server.o client.o
