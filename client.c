@@ -153,7 +153,7 @@ int run(int sock_fd) {
                                         warn("client at node %s : timeout on response from %s\n", this_vm, vm);
                                         // Send again with routing discovery
                                         if(msg_send(sock_fd, msg, canonicalIP, SERVER_PORT, 1) != strlen(msg)) {
-                                            error("msg_send with discovery failed.\n");
+                                            error("msg_send with discovery failed: %s\n", strerror(errno));
                                             running = false;
                                             // Get our of this loop
                                             break;
@@ -161,7 +161,7 @@ int run(int sock_fd) {
                                     }
                                 } while(resendAttempts++ < 1);
                             } else {
-                                error("msg_send failed.\n");
+                                error("msg_send failed: %s\n", strerror(errno));
                                 running = false;
                             }
                         } else {

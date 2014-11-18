@@ -54,24 +54,32 @@ void run_time_server(int unix_socket) {
     while(running) {
         /* msg_recv */
         if((rv = msg_recv(unix_socket, recvbuf, ip, &port)) < 0) {
-            error("msg_recv: returned %d, errno %d: %s\n", rv, errno,
+            if(errno != EINTR) {
+                error("msg_recv: returned %d, errno %d: %s\n", rv, errno,
                     strerror(errno));
+            }
             break;
         }
         /* Write time to the client */
         if ((ticks = time(NULL)) == ((time_t) - 1)) {
-            error("time failed: %s\n", strerror(errno));
+            if(errno != EINTR) {
+                error("time failed: %s\n", strerror(errno));
+            }
             break;
         }
         if ((timestr = ctime(&ticks)) == NULL) {
-            error("ctime failed: %s\n", strerror(errno));
+            if(errno != EINTR) {
+                error("ctime failed: %s\n", strerror(errno));
+            }
             break;
         }
         snprintf(sendbuf, sizeof(sendbuf), "%.24s\r\n", timestr);
         /* Send buff to client using msg_send */
         if ((rv = msg_send(unix_socket, sendbuf, ip, port, 0)) < 0) {
-            error("msg_send: returned %d, errno %d: %s\n", rv, errno,
-                    strerror(errno));
+            if(errno != EINTR) {
+                error("msg_send: returned %d, errno %d: %s\n", rv, errno,
+                        strerror(errno));
+            }
             break;
         }
     }
