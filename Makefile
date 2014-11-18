@@ -1,6 +1,6 @@
 CC = gcc
 # -O2
-FLAGS = -Wall -Werror -std=gnu89 -DCOLOR
+CFLAGS = -Wall -Werror -std=gnu89 -DCOLOR
 LIB = libapi.a
 LIBS = $(LIB)
 
@@ -12,14 +12,14 @@ TARGETS = $(LIB) $(BINS)
 
 all: $(TARGETS)
 
-debug: FLAGS += -DDEBUG -g
+debug: CFLAGS += -DDEBUG -g
 debug: $(TARGETS)
 
 $(LIB): api.o api.h
 	ar -cvq $(LIB) $<
 
-ODR_%: ODR.o $(LIB)
-	$(CC) -o $@ $< $(LIBS)
+ODR_%: ODR.o get_hw_addrs.o
+	$(CC) -o $@ $^
 
 server_%: server.o $(LIB)
 	$(CC) -o $@ $< $(LIBS)
@@ -28,10 +28,13 @@ client_%: client.o $(LIB)
 	$(CC) -o $@ $< $(LIBS)
 
 %.o: %.c %.h common.h
-	$(CC) $(FLAGS) -c $<
+	$(CC) $(CFLAGS) -c $<
+
+prhwaddrs: prhwaddrs.c get_hw_addrs.o
+	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
-	rm -f *.o $(TARGETS)
+	rm -f *.o $(TARGETS) prhwaddrs
 
 PHONY: all clean
-SECONDARY: server.o client.o
+SECONDARY: server.o client.o get_hw_addrs.o
