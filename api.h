@@ -2,8 +2,12 @@
 #define API_H
 #include <sys/types.h>
 
-ssize_t msg_send(int sd, const char *canonicalIP, int port, void *msg, int flag);
+#define MAX_MSGLEN 1024
+#define MAX_IPLEN 32
 
-ssize_t msg_recv(int sd, void *msg, const char *canonicalIP, int *port);
+ssize_t msg_send(int sd, char *msg, const char *canonicalIP, int port,
+        int flag);
+
+ssize_t msg_recv(int sd, char *msg, char *canonicalIP, int *port);
 
 #endif
