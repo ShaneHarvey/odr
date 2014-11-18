@@ -1,6 +1,7 @@
 #ifndef API_H
 #define API_H
 #include <sys/types.h>
+#include <errno.h>
 
 #define MAX_MSGLEN 1024
 #define MAX_IPLEN 32

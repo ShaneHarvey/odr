@@ -11,7 +11,9 @@ int main(int argc, char *argv[]) {
 
     /* Bind to well known file */
     addr.sun_family = AF_UNIX;
-    strcpy(addr.sun_path, server_path);
+    strncpy(addr.sun_path, server_path, sizeof(addr.sun_path) - 1);
+    /* unlink the file */
+    unlink(addr.sun_path);
     if(bind(unix_socket, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
         /* Run the time server */
         run_time_server(unix_socket);
@@ -36,7 +38,7 @@ void run_time_server(int unix_socket) {
     running = 1;
     while(running) {
         /* msg_recv */
-        if((rv =msg_recv(unix_socket, recvbuf, ip, &port)) < 0) {
+        if((rv = msg_recv(unix_socket, recvbuf, ip, &port)) < 0) {
             error("msg_recv: returned %d, errno %d: %s\n", rv, errno,
                     strerror(errno));
             break;
