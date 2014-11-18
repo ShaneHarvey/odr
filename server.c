@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
 
     /* Bind to well known file */
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, server_path, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, SERVER_PATH, sizeof(addr.sun_path) - 1);
     /* unlink the file */
     unlink(addr.sun_path);
     if(bind(unix_socket, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
