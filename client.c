@@ -129,7 +129,7 @@ int run(int sock_fd) {
                         if(gethostname(this_vm, BUFFER_SIZE) == 0) {
                             info("client at node %s sending request to server at %s\n", this_vm, vm);
                             int resendAttempts = 0;
-                            if(msg_send(sock_fd, msg, canonicalIP, SERVER_PORT, 0) == strlen(msg)) {
+                            if(msg_send(sock_fd, msg, sizeof(msg), canonicalIP, SERVER_PORT, 0) == strlen(msg)) {
                                 do {
                                     // select vars
                                     fd_set rset;
@@ -142,7 +142,8 @@ int run(int sock_fd) {
                                         char receieved_ip[BUFFER_SIZE];
                                         char received_msg[BUFFER_SIZE];
                                         int received_port = 0, bytes = 0;
-                                        if((bytes = msg_recv(sock_fd, received_msg, receieved_ip, &received_port)) > 0) {
+                                        if((bytes = msg_recv(sock_fd, received_msg, sizeof(received_msg),
+                                                receieved_ip, sizeof(receieved_ip), &received_port)) > 0) {
                                             info("client at node %s : received from %s <%s>", this_vm, vm, received_msg);
                                             // Exit the dowhile loop
                                             break;
@@ -152,7 +153,7 @@ int run(int sock_fd) {
                                     } else if(resendAttempts < 1) {
                                         warn("client at node %s : timeout on response from %s\n", this_vm, vm);
                                         // Send again with routing discovery
-                                        if(msg_send(sock_fd, msg, canonicalIP, SERVER_PORT, 1) != strlen(msg)) {
+                                        if(msg_send(sock_fd, msg, sizeof(msg), canonicalIP, SERVER_PORT, 1) != strlen(msg)) {
                                             error("msg_send with discovery failed: %s\n", strerror(errno));
                                             running = false;
                                             // Get our of this loop

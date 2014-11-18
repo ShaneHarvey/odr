@@ -1,18 +1,22 @@
 #include "api.h"
 
-ssize_t msg_send(int sd, char *msg, const char *canonicalIP, int port,
-        int flag) {
-    int size, rv;
+ssize_t msg_send(int sd, char *msg, size_t msglen, const char *canonicalIP,
+        int port, int flag) {
+    int rv, sendlen;
     struct sockaddr_un odr_addr;
-    struct in_addr ip;
-    char sendbuf[sizeof(int) + sizeof(struct in_addr) + MAX_MSGLEN];
+    struct api_msg sendmsg;
 
     if(sd < 0 || msg == NULL || canonicalIP == NULL || port < 0 || flag < 0) {
         errno = EINVAL;
         return -1;
     }
+    if(msglen > MAX_MSGLEN) {
+        /* message is too long for API */
+        errno = EMSGSIZE;
+        return -1;
+    }
     /* Convert string IP to network */
-    if((rv = inet_pton(AF_INET, canonicalIP, &ip)) <= 0) {
+    if((rv = inet_pton(AF_INET, canonicalIP, &sendmsg.ip)) <= 0) {
         /* inet_pton failed */
         return -1;
     } else if(rv == 0) {
@@ -20,69 +24,57 @@ ssize_t msg_send(int sd, char *msg, const char *canonicalIP, int port,
         errno = EINVAL;
         return -1;
     }
-    size = 0;
-    /* Copy address */
-    memcpy(sendbuf + size, &ip, sizeof(struct in_addr));
-    size += sizeof(struct in_addr);
     /* Copy port */
-    memcpy(sendbuf + size, &port, sizeof(int));
-    size += sizeof(int);
+    sendmsg.port = port;
     /* Copy flag */
-    memcpy(sendbuf + size, &flag, sizeof(int));
-    size += sizeof(int);
+    sendmsg.flag = flag;
     /* Copy message */
-    strcpy(sendbuf + size, msg);
-    size += strlen(msg);
+    memcpy(sendmsg.msg, msg, msglen);
+    /* Find out the length to send */
+    sendlen = MIN_API_MSG + msglen;
 
     /* SEND to ODR well known path */
     odr_addr.sun_family = AF_UNIX;
     strncpy(odr_addr.sun_path, ODR_PATH, sizeof(odr_addr.sun_path) - 1);
 
-    if(sendto(sd, sendbuf, size, 0, (struct sockaddr*)&odr_addr,
-            sizeof(odr_addr)) < size) {
+    if(sendto(sd, &sendmsg, sendlen, 0, (struct sockaddr*)&odr_addr,
+            sizeof(odr_addr)) < sendlen) {
         /* sendto failed to write all the data */
         return -1;
     }
-    return strlen(msg);
+    return msglen;
 }
 
-ssize_t msg_recv(int sd, char *msg, char *canonicalIP, int *port) {
-    int nread, offset;
-    struct in_addr ip;
-    char recvbuf[sizeof(int) + sizeof(struct in_addr) + MAX_MSGLEN];
+ssize_t msg_recv(int sd, char *msg, size_t msglen, char *canonicalIP,
+        size_t iplen, int *port) {
+    int recvlen, rmsglen, minlen;
+    struct api_msg recvmsg;
 
     if(sd < 0 || msg == NULL || canonicalIP == NULL || port == NULL) {
         errno = EINVAL;
         return -1;
     }
 
-    if((nread = recv(sd, recvbuf, sizeof(recvbuf), 0)) < 0) {
-        return -1;
-    }
-    /*TODO: Will port/IP be Host or Network byte order?
-     * Right now i assume that ODR will write a message like so:
-     *  struct in_addr IP address -- sizeof(struct in_addr) bytes
-     *  integer port -- sizeof(int) bytes
-     *  message -- nread - sizeof(int) - sizeof(struct in_addr) bytes
-     */
-    /* If there was no data then return error */
-    if(nread <= sizeof(int) + sizeof(struct in_addr)) {
+    if((recvlen = recv(sd, &recvmsg, sizeof(recvmsg), 0)) < 0) {
+        /* recv(2) failed */
+        return recvlen;
+    } else if(recvlen < MIN_API_MSG) {
+        /* The message was too small to be an ODR message */
         error("Invalid message from ODR: too short\n");
         errno = EBADMSG;
         return -1;
     }
-    offset = 0;
+
     /* parse IP */
-    memcpy(&ip, recvbuf, sizeof(struct in_addr));
-    offset += sizeof(struct in_addr);
-    if(inet_ntop(AF_INET, &ip, canonicalIP, MAX_IPLEN) == NULL) {
+    if(inet_ntop(AF_INET, &recvmsg.ip, canonicalIP, iplen) == NULL) {
         return -1;
     }
-    /* parse port */
-    memcpy(port, recvbuf + offset, sizeof(int));
-    offset += sizeof(int);
-    /* Parse message */
-    memcpy(msg, recvbuf + offset, nread - offset);
-    msg[nread - offset] = '\0';
-    return nread - offset;
+    /* Copy port */
+    *port = recvmsg.port;
+    /* Copy message and null-terminate */
+    rmsglen = recvlen - MIN_API_MSG;
+    minlen = rmsglen < msglen? rmsglen : msglen;
+    memcpy(msg, recvmsg.msg, minlen);
+    msg[minlen] = '\0';
+    return minlen;
 }

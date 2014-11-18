@@ -56,7 +56,8 @@ void run_time_server(int unix_socket) {
 
     while(1) {
         /* msg_recv */
-        if((rv = msg_recv(unix_socket, recvbuf, ip, &port)) < 0) {
+        if((rv = msg_recv(unix_socket, recvbuf, sizeof(recvbuf), ip,
+                sizeof(ip), &port)) < 0) {
             error("msg_recv: returned %d, errno %d: %s\n", rv, errno,
                     strerror(errno));
             break;
@@ -72,7 +73,8 @@ void run_time_server(int unix_socket) {
         }
         snprintf(sendbuf, sizeof(sendbuf), "%.24s\r\n", timestr);
         /* Send buff to client using msg_send */
-        if ((rv = msg_send(unix_socket, sendbuf, ip, port, 0)) < 0) {
+        if ((rv = msg_send(unix_socket, sendbuf, sizeof(sendbuf), ip, port,
+                0)) < 0) {
             error("msg_send: returned %d, errno %d: %s\n", rv, errno,
                     strerror(errno));
             break;
