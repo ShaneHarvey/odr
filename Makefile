@@ -1,5 +1,6 @@
 CC = gcc
-FLAGS = -g -O2 -Wall -Werror -std=gnu89 -DCOLOR
+# -O2
+FLAGS = -Wall -Werror -std=gnu89 -DCOLOR
 LIB = libapi.a
 LIBS = $(LIB)
 
@@ -10,6 +11,9 @@ BINS=$(TMP:=_$(USER))
 TARGETS = $(LIB) $(BINS)
 
 all: $(TARGETS)
+
+debug: FLAGS += -DDEBUG -g
+debug: $(TARGETS)
 
 $(LIB): api.o api.h
 	ar -cvq $(LIB) $<
