@@ -3,7 +3,7 @@
 
 #define SERVER_PORT 8080
 
-char *server_path = "/path/to/server/file";
-char *ODR_path = "/path/to/ODR/file";
+char *server_path = "./server.tmp";
+char *ODR_path = "/home/cse533-14/ODR.tmp";
 
 #endif

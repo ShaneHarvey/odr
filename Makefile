@@ -18,13 +18,13 @@ debug: $(TARGETS)
 $(LIB): api.o api.h
 	ar -cvq $(LIB) $<
 
-ODR_%: ODR.o
+ODR_%: ODR.o $(LIB)
 	$(CC) -o $@ $< $(LIBS)
 
-server_%: server.o
+server_%: server.o $(LIB)
 	$(CC) -o $@ $< $(LIBS)
 
-client_%: client.o
+client_%: client.o $(LIB)
 	$(CC) -o $@ $< $(LIBS)
 
 %.o: %.c %.h common.h
