@@ -37,4 +37,4 @@ clean:
 	rm -f *.o $(TARGETS) prhwaddrs
 
 PHONY: all clean
-SECONDARY: server.o client.o get_hw_addrs.o
+SECONDARY: server.o client.o ODR.o get_hw_addrs.o
