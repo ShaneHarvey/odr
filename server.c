@@ -20,6 +20,35 @@ static void set_sig_cleanup(void) {
     }
 }
 
+static int gethostbystr(char *canonicalIP, char *host, size_t hostlen) {
+    int rv;
+    struct hostent *he;
+    struct in_addr ip;
+
+    if(host == NULL) {
+        error("host can not be NULL.\n");
+        return 0;
+    }
+    /* Convert IP from presentation to network */
+    if((rv = inet_pton(AF_INET, canonicalIP, &ip)) <= 0) {
+        /* inet_pton failed */
+        error("inet_pton failed: %s\n", strerror(errno));
+        return 0;
+    } else if(rv == 0) {
+        /* canonicalIP is invalid */
+        error("inet_pton failed: canonicalIP is an invalid IPv4 address.\n");
+        return 0;
+    }
+
+    if((he = gethostbyaddr(&ip, sizeof(struct in_addr), AF_INET)) == NULL) {
+        error("gethostbyaddr failed: %s\n", hstrerror(h_errno));
+        return 0;
+    }
+    strncpy(host, he->h_name, hostlen);
+    host[hostlen] = '\0';
+    return 1;
+}
+
 int main(int argc, char *argv[]) {
     int unix_socket;
     struct sockaddr_un addr;
@@ -52,8 +81,14 @@ int main(int argc, char *argv[]) {
 void run_time_server(int unix_socket) {
     int rv, port;
     time_t ticks;
-    char recvbuf[MAX_MSGLEN], sendbuf[MAX_MSGLEN], ip[MAX_IPLEN], *timestr;
+    char myhost[HOST_NAME_MAX], chost[HOST_NAME_MAX], recvbuf[MAX_MSGLEN],
+            sendbuf[MAX_MSGLEN], ip[MAX_IPLEN], *timestr;
 
+    /* Lookup our hostname */
+    if(gethostname(myhost, sizeof(myhost)) < 0) {
+        error("gethostname failed: %s\n", strerror(errno));
+        return;
+    }
     while(1) {
         /* msg_recv */
         if((rv = msg_recv(unix_socket, recvbuf, sizeof(recvbuf), ip,
@@ -62,7 +97,12 @@ void run_time_server(int unix_socket) {
                     strerror(errno));
             break;
         }
-        /* Write time to the client */
+        /* Determine client's hostname */
+        if(!gethostbystr(ip, chost, sizeof(chost))) {
+            break;
+        }
+        info("server at node %s responding to request from %s", myhost, chost);
+        /* Construct a timestamp */
         if ((ticks = time(NULL)) == ((time_t) - 1)) {
             error("time failed: %s\n", strerror(errno));
             break;

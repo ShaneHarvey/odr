@@ -7,10 +7,12 @@
 #include <unistd.h>
 #include <errno.h>
 /* System headers */
+#include <limits.h>
 #include <signal.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include <sys/un.h>
 /* Program headers */
 #include "common.h"
