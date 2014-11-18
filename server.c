@@ -1,26 +1,30 @@
 #include "server.h"
 
-static int running = 1;
+static void cleanup(int signum) {
+    /* remove the UNIX socket file */
+    unlink(SERVER_PATH);
+    /* 128+n Fatal error signal "n" is the standard Linux exit code */
+    exit(128 + signum);
+}
 
-static void sigint(int signum, siginfo_t *siginfo, void *context) {
-    running = 0;
+static void set_sig_cleanup(void) {
+    struct sigaction sigac_int;
+    /* Zero out memory */
+    memset(&sigac_int, 0, sizeof(sigac_int));
+    /* Set values */
+    sigac_int.sa_handler = &cleanup;
+    /* Set the sigaction */
+    if(sigaction(SIGINT, &sigac_int, NULL) < 0) {
+        error("sigaction failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 }
 
 int main(int argc, char *argv[]) {
     int unix_socket;
     struct sockaddr_un addr;
 
-    struct sigaction sigac_int;
-    /* Zero out memory */
-    memset(&sigac_int, 0, sizeof(sigac_int));
-    /* Set values */
-    sigac_int.sa_sigaction = &sigint;
-    sigac_int.sa_flags = SA_SIGINFO;
-    /* Set the sigactions */
-    if(sigaction(SIGINT, &sigac_int, NULL) < 0) {
-        error("sigaction failed: %s\n", strerror(errno));
-        return EXIT_FAILURE;
-    }
+    set_sig_cleanup();
     /* Create UNIX socket */
     unix_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
 
@@ -39,7 +43,7 @@ int main(int argc, char *argv[]) {
     /* unlink the file */
     unlink(addr.sun_path);
     close(unix_socket);
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE;
 }
 
 /*
@@ -50,36 +54,27 @@ void run_time_server(int unix_socket) {
     time_t ticks;
     char recvbuf[MAX_MSGLEN], sendbuf[MAX_MSGLEN], ip[MAX_IPLEN], *timestr;
 
-    running = 1;
-    while(running) {
+    while(1) {
         /* msg_recv */
         if((rv = msg_recv(unix_socket, recvbuf, ip, &port)) < 0) {
-            if(errno != EINTR) {
-                error("msg_recv: returned %d, errno %d: %s\n", rv, errno,
+            error("msg_recv: returned %d, errno %d: %s\n", rv, errno,
                     strerror(errno));
-            }
             break;
         }
         /* Write time to the client */
         if ((ticks = time(NULL)) == ((time_t) - 1)) {
-            if(errno != EINTR) {
-                error("time failed: %s\n", strerror(errno));
-            }
+            error("time failed: %s\n", strerror(errno));
             break;
         }
         if ((timestr = ctime(&ticks)) == NULL) {
-            if(errno != EINTR) {
-                error("ctime failed: %s\n", strerror(errno));
-            }
+            error("ctime failed: %s\n", strerror(errno));
             break;
         }
         snprintf(sendbuf, sizeof(sendbuf), "%.24s\r\n", timestr);
         /* Send buff to client using msg_send */
         if ((rv = msg_send(unix_socket, sendbuf, ip, port, 0)) < 0) {
-            if(errno != EINTR) {
-                error("msg_send: returned %d, errno %d: %s\n", rv, errno,
-                        strerror(errno));
-            }
+            error("msg_send: returned %d, errno %d: %s\n", rv, errno,
+                    strerror(errno));
             break;
         }
     }
