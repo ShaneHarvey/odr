@@ -129,7 +129,7 @@ int run(int sock_fd) {
                         if(gethostname(this_vm, BUFFER_SIZE) == 0) {
                             info("client at node %s sending request to server at %s\n", this_vm, vm);
                             int resendAttempts = 0;
-                            if(msg_send(sock_fd, canonicalIP, SERVER_PORT, msg, 0) == strlen(msg)) {
+                            if(msg_send(sock_fd, msg, canonicalIP, SERVER_PORT, 0) == strlen(msg)) {
                                 do {
                                     // select vars
                                     fd_set rset;
@@ -152,7 +152,7 @@ int run(int sock_fd) {
                                     } else if(resendAttempts < 1) {
                                         warn("client at node %s : timeout on response from %s\n", this_vm, vm);
                                         // Send again with routing discovery
-                                        if(msg_send(sock_fd, canonicalIP, SERVER_PORT, msg, 1) != strlen(msg)) {
+                                        if(msg_send(sock_fd, msg, canonicalIP, SERVER_PORT, 1) != strlen(msg)) {
                                             error("msg_send with discovery failed.\n");
                                             running = false;
                                             // Get our of this loop
