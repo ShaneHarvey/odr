@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 /* System headers */
+#include <signal.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/socket.h>

@@ -2,10 +2,25 @@
 
 static int running = 1;
 
+static void sigint(int signum, siginfo_t *siginfo, void *context) {
+    running = 0;
+}
+
 int main(int argc, char *argv[]) {
     int unix_socket;
     struct sockaddr_un addr;
 
+    struct sigaction sigac_int;
+    /* Zero out memory */
+    memset(&sigac_int, 0, sizeof(sigac_int));
+    /* Set values */
+    sigac_int.sa_sigaction = &sigint;
+    sigac_int.sa_flags = SA_SIGINFO;
+    /* Set the sigactions */
+    if(sigaction(SIGINT, &sigac_int, NULL) < 0) {
+        error("sigaction failed: %s\n", strerror(errno));
+        return EXIT_FAILURE;
+    }
     /* Create UNIX socket */
     unix_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
 
