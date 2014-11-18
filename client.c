@@ -197,6 +197,4 @@ INVALID_VM:
 void intHandler(int signal) {
     running = false;
     fclose(stdin);
-    /* This is supposed to be bad, but.. */
-    printf("\n");
 }
