@@ -24,7 +24,7 @@ static void set_sig_cleanup(void) {
 }
 
 int main(int argc, char **argv) {
-    int unixsock, rawsock;
+    int unixsock, packsock;
     struct sockaddr_un unaddr;
     struct hwa_info *hwahead;
     double staleness;
@@ -55,8 +55,8 @@ int main(int argc, char **argv) {
         useclim = 1000000L * staleness;
     }
 
-    /* Create raw socket to receive only our ODR protocol */
-    if((rawsock = socket(AF_PACKET, SOCK_RAW, htons(ODR_PROTOCOL))) < 0) {
+    /* Create packet socket to receive only our ODR protocol */
+    if((packsock = socket(AF_PACKET, SOCK_RAW, htons(ODR_PROTOCOL))) < 0) {
         error("socket failed: %s\n", strerror(errno));
         return EXIT_FAILURE;
     }
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
     }
 
     /* Start the ODR service */
-    run_odr(unixsock, rawsock, hwahead);
+    run_odr(unixsock, packsock, hwahead);
 FREE_HWA:
     free_hwa_info(hwahead);
 CLOSE_UNIX:
@@ -102,26 +102,26 @@ CLOSE_UNIX:
     unlink(ODR_PATH);
     close(unixsock);
 CLOSE_RAW:
-    close(rawsock);
+    close(packsock);
     return EXIT_FAILURE;
 }
 
-void run_odr(int unixsock, int rawsock, struct hwa_info *hwahead) {
+void run_odr(int unixsock, int packsock, struct hwa_info *hwahead) {
     int maxfd, nread;
     fd_set rset;
 
-    maxfd = unixsock > rawsock? unixsock + 1 : rawsock + 1;
+    maxfd = unixsock > packsock ? unixsock + 1 : packsock + 1;
     /* Select on the two sockets forever */
     while(1) {
         FD_ZERO(&rset);
         FD_SET(unixsock, &rset);
-        FD_SET(rawsock, &rset);
+        FD_SET(packsock, &rset);
         if(select(maxfd, &rset, NULL, NULL, NULL) < 0) {
             error("select failed: %s\n", strerror(errno));
             return;
         }
 
-        /* UNIX Socket is readable */
+        /* UNIX socket is readable */
         if(FD_ISSET(unixsock, &rset)) {
             struct sockaddr_un unaddr;
             socklen_t addrlen;
@@ -140,19 +140,19 @@ void run_odr(int unixsock, int rawsock, struct hwa_info *hwahead) {
             }
         }
 
-        /* Raw Socket is readable */
-        if(FD_ISSET(rawsock, &rset)) {
+        /* Packet socket is readable */
+        if(FD_ISSET(packsock, &rset)) {
             struct sockaddr_ll lladdr;
             socklen_t addrlen;
             char buf[2048];
 
             if((nread = recvfrom(unixsock, buf, sizeof(buf), 0,
                     (struct sockaddr *)&lladdr, &addrlen)) < 0) {
-                error("unix socket recv failed: %s\n", strerror(errno));
+                error("packet socket recv failed: %s\n", strerror(errno));
                 return;
             } else {
                 /* valid API message received */
-                info("ODR received valid packet from raw socket\n");
+                info("ODR received valid packet from packet socket\n");
             }
         }
     }

@@ -29,10 +29,10 @@
 /* Message that the API writes to ODR's UNIX Socket */
 /* Message that the ODR writes to the API's UNIX socket (client/server) */
 struct api_msg {
-    struct in_addr ip;
-    int port;
-    int flag;
-    char msg[MAX_MSGLEN];
+    struct in_addr ip;      /* Source/Destination IP */
+    int port;               /* Source/Destination Port */
+    int flag;               /* Force RREQ flag for sending to ODR */
+    char msg[MAX_MSGLEN];   /* Application message */
 };
 /* The minimum message is an api_msg with 0 bytes of data */
 #define MIN_API_MSG (sizeof(struct api_msg) - MAX_MSGLEN)
