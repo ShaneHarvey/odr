@@ -55,7 +55,10 @@ int main(int argc, char *argv[]) {
 
     set_sig_cleanup();
     /* Create UNIX socket */
-    unix_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if((unix_socket = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
+        error("socket failed: %s\n", strerror(errno));
+        return EXIT_FAILURE;
+    }
 
     /* Bind to well known file */
     addr.sun_family = AF_UNIX;
