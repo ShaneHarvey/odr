@@ -51,13 +51,19 @@ ODR
         remove_stale_routes()
         if FORCE_RREQ
             remove_route(dest ip)
-        add_route to source MAC <-------Update if shorter numhops OR same hops but diff ifindex or MAC
+        add_route to source MAC <-------Update if shorter numhops OR same hops
+                                        but diff ifindex or MAC
         /* proces ODR message */
         if msg.type == RREQ
-            if msg.dstip == thisnode || complete_route(msg.dstip)
+            if msg.dstip == thisnode
                 send RREP
+            else if complete_route(msg.dstip)
+                send RREP
+                if previously_unknown source <------If the so
+                    set flags to ODR_RREP_SENT
+                    broadcast RREQ to each interface except source
             else
-                broadcast RREQ to each interface except sourcce
+                broadcast RREQ to each interface except source
         else if RREP
         else if DATA
         else
