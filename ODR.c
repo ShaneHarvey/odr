@@ -1,5 +1,7 @@
 #include "ODR.h"
 
+static char myhost[HOST_NAME_MAX];
+
 static void cleanup(int signum) {
     /* remove the UNIX socket file */
     unlink(ODR_PATH);
@@ -24,7 +26,7 @@ int main(int argc, char **argv) {
     int unixsock, rawsock;
     struct sockaddr_un unaddr;
     double staleness;
-    char *endptr, myhost[HOST_NAME_MAX];
+    char *endptr;
 
     if(argc != 2) {
         fprintf(stderr, "Usage:   %s staleness_in_seconds\n", argv[0]);
@@ -47,14 +49,6 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     } else {
         info("staleness = %f seconds.\n", staleness);
-    }
-
-    /* Lookup our hostname */
-    if(gethostname(myhost, sizeof(myhost)) < 0) {
-        error("gethostname failed: %s\n", strerror(errno));
-        return EXIT_FAILURE;
-    } else {
-        info("ODR Service running on node %s\n", myhost);
     }
 
     /* Create raw socket to receive only our ODR protocol */
@@ -81,8 +75,16 @@ int main(int argc, char **argv) {
         goto CLOSE_UNIX;
     }
 
+    /* Lookup our hostname */
+    if(gethostname(myhost, sizeof(myhost)) < 0) {
+        error("gethostname failed: %s\n", strerror(errno));
+        return EXIT_FAILURE;
+    } else {
+        info("ODR running on node %s\n", myhost);
+    }
+
     /* Start the ODR service */
-    run_odr(unixsock, rawsock, myhost);
+    run_odr(unixsock, rawsock);
 
 CLOSE_UNIX:
     /* unlink the file */
@@ -93,6 +95,7 @@ CLOSE_RAW:
     return EXIT_FAILURE;
 }
 
-int run_odr(int unixsock, int rawsock, char *myhost) {
+int run_odr(int unixsock, int rawsock) {
+
     return 0;
 }
