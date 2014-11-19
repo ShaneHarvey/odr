@@ -25,8 +25,10 @@ static void set_sig_cleanup(void) {
 int main(int argc, char **argv) {
     int unixsock, rawsock;
     struct sockaddr_un unaddr;
+    struct hwa_info *hwahead;
     double staleness;
     char *endptr;
+
 
     if(argc != 2) {
         fprintf(stderr, "Usage:   %s staleness_in_seconds\n", argv[0]);
@@ -75,17 +77,24 @@ int main(int argc, char **argv) {
         goto CLOSE_UNIX;
     }
 
+    /* Find our interfaces */
+    if((hwahead = get_hw_addrs()) == NULL) {
+        error("Failed to get hardware addresses\n");
+        goto CLOSE_UNIX;
+    }
+
     /* Lookup our hostname */
     if(gethostname(myhost, sizeof(myhost)) < 0) {
         error("gethostname failed: %s\n", strerror(errno));
-        return EXIT_FAILURE;
+        goto FREE_HWA;
     } else {
         info("ODR running on node %s\n", myhost);
     }
 
     /* Start the ODR service */
-    run_odr(unixsock, rawsock);
-
+    run_odr(unixsock, rawsock, hwahead);
+FREE_HWA:
+    free_hwa_info(hwahead);
 CLOSE_UNIX:
     /* unlink the file */
     unlink(ODR_PATH);
@@ -95,7 +104,7 @@ CLOSE_RAW:
     return EXIT_FAILURE;
 }
 
-int run_odr(int unixsock, int rawsock) {
+int run_odr(int unixsock, int rawsock, struct hwa_info *hwahead) {
 
     return 0;
 }
