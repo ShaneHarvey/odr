@@ -47,4 +47,18 @@ ODR
                 /* Next, Broadcast an RREQ out on each interface */
 
     recvfrom on packet socket
-        /* do stuff */
+        /* Update route table */
+        remove_stale_routes()
+        if FORCE_RREQ
+            remove_route(dest ip)
+        add_route to source MAC <-------Update if shorter numhops OR same hops but diff ifindex or MAC
+        /* proces ODR message */
+        if msg.type == RREQ
+            if msg.dstip == thisnode || complete_route(msg.dstip)
+                send RREP
+            else
+                broadcast RREQ to each interface except sourcce
+        else if RREP
+        else if DATA
+        else
+            warn invalid message type
