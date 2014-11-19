@@ -5,6 +5,9 @@
 #include <sys/select.h>
 
 #define ODR_PROTOCOL 62239
+
+#define ODR_MIN_STALE 0.0
+#define ODR_MAX_STALE 86400.0
 /* TODO: What is the real max? */
 #define ODR_MAX_DATA 256
 

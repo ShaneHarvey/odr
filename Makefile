@@ -1,5 +1,4 @@
 CC = gcc
-# -O2
 CFLAGS = -Wall -Werror -std=gnu89 -DCOLOR
 LIB = libapi.a
 LIBS = $(LIB)

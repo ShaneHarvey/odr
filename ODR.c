@@ -41,13 +41,14 @@ int main(int argc, char **argv) {
     errno = 0;
     staleness = strtod(argv[1], &endptr);
     if(errno != 0) {
-        error("Arg staleness: %s\n", strerror(errno));
+        error("staleness arg: %s\n", strerror(errno));
         return EXIT_FAILURE;
     } else if (endptr == argv[1] || *endptr != '\0') {
-        error("Arg staleness: must be a double\n");
+        error("staleness arg: must be a double\n");
         return EXIT_FAILURE;
-    } else if(staleness < 0.0 || staleness > 3600.0) {
-        error("Arg staleness: must be between 0.0-3600.0 seconds\n");
+    } else if(staleness < ODR_MIN_STALE || staleness > ODR_MAX_STALE) {
+        error("staleness arg: must be between %.1f-%.1f seconds\n",
+                ODR_MIN_STALE, ODR_MAX_STALE);
         return EXIT_FAILURE;
     } else {
         info("staleness = %f seconds.\n", staleness);
