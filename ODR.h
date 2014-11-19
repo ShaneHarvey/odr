@@ -4,7 +4,8 @@
 #include "get_hw_addrs.h"
 #include <sys/select.h>
 
-#define ODR_PROTOCOL 62239
+/* Used as the ethernet frame type */
+#define ODR_PROTOCOL 0xF31F
 
 #define ODR_MIN_STALE 0.0
 #define ODR_MAX_STALE 86400.0
