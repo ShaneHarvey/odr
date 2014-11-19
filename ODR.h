@@ -2,6 +2,7 @@
 #define ODR_H
 #include "common.h"
 #include "get_hw_addrs.h"
+#include <sys/select.h>
 
 #define ODR_PROTOCOL 62239
 

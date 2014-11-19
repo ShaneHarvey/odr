@@ -105,6 +105,53 @@ CLOSE_RAW:
 }
 
 void run_odr(int unixsock, int rawsock, struct hwa_info *hwahead) {
+    int maxfd, nread;
+    fd_set rset;
 
+    maxfd = unixsock > rawsock? unixsock + 1 : rawsock + 1;
+    /* Select on the two sockets forever */
+    while(1) {
+        FD_ZERO(&rset);
+        FD_SET(unixsock, &rset);
+        FD_SET(rawsock, &rset);
+        if(select(maxfd, &rset, NULL, NULL, NULL) < 0) {
+            error("select failed: %s\n", strerror(errno));
+            return;
+        }
+
+        /* UNIX Socket is readable */
+        if(FD_ISSET(unixsock, &rset)) {
+            struct sockaddr_un unaddr;
+            socklen_t addrlen;
+            struct api_msg recvmsg;
+
+            if((nread = recvfrom(unixsock, &recvmsg, sizeof(recvmsg), 0,
+                    (struct sockaddr *)&unaddr, &addrlen)) < 0) {
+                error("UNIX socket recvfrom failed: %s\n", strerror(errno));
+                return;
+            } else if(nread < MIN_API_MSG) {
+                /* Ignore messages that are too short */
+                warn("Ignoring short message from UNIX socket\n");
+            } else {
+                /* valid API message received */
+                info("ODR received valid message from UNIX socket\n");
+            }
+        }
+
+        /* Raw Socket is readable */
+        if(FD_ISSET(rawsock, &rset)) {
+            struct sockaddr_ll lladdr;
+            socklen_t addrlen;
+            char buf[2048];
+
+            if((nread = recvfrom(unixsock, buf, sizeof(buf), 0,
+                    (struct sockaddr *)&lladdr, &addrlen)) < 0) {
+                error("unix socket recv failed: %s\n", strerror(errno));
+                return;
+            } else {
+                /* valid API message received */
+                info("ODR received valid packet from raw socket\n");
+            }
+        }
+    }
 }
-
