@@ -1,6 +1,7 @@
 #include "ODR.h"
 
 static char myhost[HOST_NAME_MAX];
+static uint64_t useclim = 1000000L;
 
 static void cleanup(int signum) {
     /* remove the UNIX socket file */
@@ -29,7 +30,6 @@ int main(int argc, char **argv) {
     double staleness;
     char *endptr;
 
-
     if(argc != 2) {
         fprintf(stderr, "Usage:   %s staleness_in_seconds\n", argv[0]);
         fprintf(stderr, "Example: %s 2\n", argv[0]);
@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     } else {
         info("staleness = %f seconds.\n", staleness);
+        useclim = 1000000L * staleness;
     }
 
     /* Create raw socket to receive only our ODR protocol */

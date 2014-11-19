@@ -74,8 +74,6 @@ static bool isValidVM(const char *vm) {
             int vm_num = strtol(vm, &error, 10);
             if(vm_num > 0 && vm_num < 11 && *error == '\0') {
                 valid = true;
-            } else {
-                warn("Invalid VM '%s' provided.\n", vm);
             }
         }
     }

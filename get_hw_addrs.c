@@ -4,7 +4,7 @@
 struct hwa_info *get_hw_addrs(void) {
     struct hwa_info    *hwa, *hwahead, **hwapnext;
     int       sockfd, len, lastlen, alias, nInterfaces, i;
-    char   *buf, lastname[IF_NAME], *cptr;
+    char   *buf, lastname[IFNAMSIZ], *cptr;
     struct ifconf    ifc;
     struct ifreq    *ifr, *item, ifrcopy;
     struct sockaddr    *sinptr;
@@ -49,15 +49,15 @@ struct hwa_info *get_hw_addrs(void) {
             goto FREE_BUF;
         }
 
-        memcpy(hwa->if_name, item->ifr_name, IF_NAME);        /* interface name */
-        hwa->if_name[IF_NAME-1] = '\0';
-                /* start to check if alias address */
+        memcpy(hwa->if_name, item->ifr_name, IFNAMSIZ);        /* interface name */
+        hwa->if_name[IFNAMSIZ-1] = '\0';
+        /* start to check if alias address */
         if ( (cptr = (char *) strchr(item->ifr_name, ':')) != NULL)
             *cptr = 0;        /* replace colon will null */
-        if (strncmp(lastname, item->ifr_name, IF_NAME) == 0) {
+        if (strncmp(lastname, item->ifr_name, IFNAMSIZ) == 0) {
             alias = IP_ALIAS;
         }
-        memcpy(lastname, item->ifr_name, IF_NAME);
+        memcpy(lastname, item->ifr_name, IFNAMSIZ);
         ifrcopy = *item;
         *hwapnext = hwa;        /* prev points to this new one */
         hwapnext = &hwa->hwa_next;    /* pointer to next one goes here */
@@ -72,7 +72,7 @@ struct hwa_info *get_hw_addrs(void) {
         if (ioctl(sockfd, SIOCGIFHWADDR, &ifrcopy) < 0) {
             error("ioctl SIOCGIFHWADDR failed: %s", strerror(errno));
         }
-        memcpy(hwa->if_haddr, ifrcopy.ifr_hwaddr.sa_data, IF_HADDR);
+        memcpy(hwa->if_haddr, ifrcopy.ifr_hwaddr.sa_data, IFHWADDRLEN);
         /* get interface index */
         if (ioctl(sockfd, SIOCGIFINDEX, &ifrcopy) < 0) {
             error("ioctl SIOCGIFINDEX failed: %s", strerror(errno));

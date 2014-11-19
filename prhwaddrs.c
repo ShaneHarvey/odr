@@ -37,12 +37,12 @@ int main (int argc, char **argv) {
                 prflag = 1;
                 break;
             }
-        } while (++i < IF_HADDR);
+        } while (++i < IFHWADDRLEN);
 
         if (prflag) {
             printf("         HW addr = ");
             ptr = hwa->if_haddr;
-            i = IF_HADDR;
+            i = IFHWADDRLEN;
             do {
                 printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
             } while (--i > 0);

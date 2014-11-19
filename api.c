@@ -73,7 +73,7 @@ ssize_t msg_recv(int sd, char *msg, size_t msglen, char *canonicalIP,
     *port = recvmsg.port;
     /* Copy message and null-terminate */
     rmsglen = recvlen - MIN_API_MSG;
-    minlen = rmsglen < msglen? rmsglen : msglen;
+    minlen = rmsglen < msglen? rmsglen : msglen - 1;
     memcpy(msg, recvmsg.msg, minlen);
     msg[minlen] = '\0';
     return minlen;
