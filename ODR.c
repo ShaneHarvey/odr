@@ -104,7 +104,7 @@ CLOSE_RAW:
     return EXIT_FAILURE;
 }
 
-int run_odr(int unixsock, int rawsock, struct hwa_info *hwahead) {
+void run_odr(int unixsock, int rawsock, struct hwa_info *hwahead) {
 
-    return 0;
 }
+
