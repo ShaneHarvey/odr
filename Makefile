@@ -18,11 +18,11 @@ debug: $(TARGETS)
 $(LIB): api.o api.h
 	ar -cvq $(LIB) $<
 
-ODR_%: ODR.o get_hw_addrs.o
+ODR_%: ODR.o common.o get_hw_addrs.o
 	$(CC) -o $@ $^
 
-server_%: server.o $(LIB)
-	$(CC) -o $@ $< $(LIBS)
+server_%: server.o common.o $(LIB)
+	$(CC) -o $@ $< common.o $(LIBS)
 
 client_%: client.o $(LIB)
 	$(CC) -o $@ $< $(LIBS)
@@ -37,4 +37,4 @@ clean:
 	rm -f *.o $(TARGETS) prhwaddrs
 
 PHONY: all clean
-SECONDARY: server.o client.o ODR.o get_hw_addrs.o
+SECONDARY: server.o client.o ODR.o common.o get_hw_addrs.o

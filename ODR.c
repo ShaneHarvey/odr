@@ -24,7 +24,8 @@ int main(int argc, char **argv) {
     int unixsock, rawsock;
     struct sockaddr_un unaddr;
     double staleness;
-    char *endptr;
+    char *endptr, myhost[HOST_NAME_MAX];
+
     if(argc != 2) {
         fprintf(stderr, "Usage:   %s staleness_in_seconds\n", argv[0]);
         fprintf(stderr, "Example: %s 2\n", argv[0]);
@@ -44,8 +45,17 @@ int main(int argc, char **argv) {
     } else if(staleness < 0.0 || staleness > 3600.0) {
         error("Arg staleness: must be between 0.0-3600.0 seconds\n");
         return EXIT_FAILURE;
+    } else {
+        info("staleness = %f seconds.\n", staleness);
     }
-    info("staleness = %f seconds.\n", staleness);
+
+    /* Lookup our hostname */
+    if(gethostname(myhost, sizeof(myhost)) < 0) {
+        error("gethostname failed: %s\n", strerror(errno));
+        return EXIT_FAILURE;
+    } else {
+        info("ODR Service running on node %s\n", myhost);
+    }
 
     /* Create raw socket to receive only our ODR protocol */
     if((rawsock = socket(AF_PACKET, SOCK_RAW, htons(ODR_PROTOCOL))) < 0) {
@@ -71,8 +81,8 @@ int main(int argc, char **argv) {
         goto CLOSE_UNIX;
     }
 
-    /* Run the ODR service */
-    run_odr_service(unixsock, rawsock);
+    /* Start the ODR service */
+    run_odr(unixsock, rawsock, myhost);
 
 CLOSE_UNIX:
     /* unlink the file */
@@ -83,6 +93,6 @@ CLOSE_RAW:
     return EXIT_FAILURE;
 }
 
-int run_odr_service(int unixsock, int rawsock) {
+int run_odr(int unixsock, int rawsock, char *myhost) {
     return 0;
 }

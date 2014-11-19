@@ -15,6 +15,6 @@
 
 #define ODR_PROTOCOL 62239
 
-int run_odr_service(int unixsock, int rawsock);
+int run_odr(int unixsock, int rawsock, char *myhost);
 
 #endif
