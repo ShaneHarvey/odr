@@ -109,6 +109,7 @@ CLOSE_RAW:
 void run_odr(int unixsock, int packsock, struct hwa_info *hwahead) {
     int maxfd, nread;
     fd_set rset;
+    struct route *routingTable = NULL;
 
     maxfd = unixsock > packsock ? unixsock + 1 : packsock + 1;
     /* Select on the two sockets forever */
@@ -137,6 +138,7 @@ void run_odr(int unixsock, int packsock, struct hwa_info *hwahead) {
             } else {
                 /* valid API message received */
                 info("ODR received valid message from UNIX socket\n");
+                cleanup_stale(routingTable);
             }
         }
 
@@ -155,5 +157,11 @@ void run_odr(int unixsock, int packsock, struct hwa_info *hwahead) {
                 info("ODR received valid packet from packet socket\n");
             }
         }
+    }
+}
+
+void cleanup_stale(struct route *routingTable) {
+    if(routingTable != NULL) {
+        /* Cleanup */
     }
 }

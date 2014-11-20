@@ -67,4 +67,6 @@ struct odr_port {
 
 void run_odr(int unixsock, int rawsock, struct hwa_info *hwahead);
 
+void cleanup_stale(struct route *routingTable);
+
 #endif
