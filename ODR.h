@@ -14,6 +14,7 @@
 #define ODR_MAX_DATA 256
 
 struct route {
+    int complete;              /* true if this route entry is complete */
     struct in_addr dstip;      /* ‘canonical’ IP address of the destination */
     char nxthop[IFHWADDRLEN];  /* MAC address of next-hop node */
     int if_index;              /* Outgoing interface index */

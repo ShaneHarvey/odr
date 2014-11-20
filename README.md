@@ -72,7 +72,16 @@ recvfrom on packet socket
         if msg.dstip == thisnode
             /* do nothing cause we already added route? */
         else if incomplete_route(msg.dstip)
-            append odr_msg to the incomplete route entry's message queue
+            /* search odr_msg queue for same RREP (src/dst IP the same)
+             * if found
+             *     if found.numhops > msg.numhops
+             *          Update the already queued msg numhops :)
+             *          found.numhops = msg.numhops
+             *     else
+             *         drop the duplicate RREP msg there is a better RREP
+             * else
+             *     append msg to queue
+             */
         else if complete_route(msg.dstip)
             /* Do not forward suboptimal RREPs */
         else
