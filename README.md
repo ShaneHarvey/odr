@@ -56,15 +56,42 @@ ODR
         /* proces ODR message */
         if msg.type == RREQ
             if msg.dstip == thisnode
-                send RREP
+                send_rrep()
             else if complete_route(msg.dstip)
-                send RREP
-                if previously_unknown source <------If the so
+                was_sent = send_rrep()
+                if was_sent && previously_unknown source
                     set flags to ODR_RREP_SENT
                     broadcast RREQ to each interface except source
-            else
+            else if bid_lookup(srcip, broadcastid) == NULL
                 broadcast RREQ to each interface except source
+            else
+                /* duplicate RREQ ignored */
         else if RREP
+            /* TDOD: Finish */
+            if msg.dstip == thisnode
+                /* do nothing cause we already added route? */
+            else if incomplete_route(msg.dstip)
+                append odr_msg to the incomplete route entry's message queue
+            else if complete_route(msg.dstip)
+                /* Do not forward suboptimal RREPs */
+            else
+                /* No route exists, send RREQ for msg.dstip */
         else if DATA
+            /* TDOD: Finish */
         else
             warn invalid message type
+
+function send_rrep() {
+    was_sent = false
+    bid_node = bid_lookup(srcip, broadcastid)
+    if(bid_node == NULL) {
+        send RREP message
+        add_bid_node(srcip, broadcastid, new_numhops)
+        was_sent = true
+    } else if(new_numhops < bid_node->numhops) {
+        send RREP message
+        add_bid_node(srcip, broadcastid, new_numhops)
+        was_sent = true
+    }
+    return was_sent
+}
