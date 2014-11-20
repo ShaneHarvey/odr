@@ -46,7 +46,7 @@ struct hwa_info *get_hw_addrs(void) {
         item = &ifr[i];
          alias = 0; 
         if((hwa = calloc(1, sizeof(struct hwa_info))) == NULL) {
-            goto FREE_BUF;
+            goto FREE_HWA;
         }
 
         memcpy(hwa->if_name, item->ifr_name, IFNAMSIZ);        /* interface name */
@@ -81,6 +81,8 @@ struct hwa_info *get_hw_addrs(void) {
     }
     free(buf);
     return(hwahead);    /* pointer to first structure in linked list */
+FREE_HWA:
+    free_hwa_info(hwahead);
 FREE_BUF:
     free(buf);
 CLOSE_SOCK:
