@@ -164,8 +164,11 @@ int run(int sock_fd) {
                                 if(resendAttempts > 1) {
                                     warn("client at node %s failed to receive response from server at %s\n", this_vm, vm);
                                 }
+                            } else if(sent_bytes < 0) {
+                                error("msg_send failed: %s\n", strerror(errno));
+                                running = false;
                             } else {
-                                error("msg_send failed; Should of sent %lu bytes, but %d were actually sent.\n", strlen(msg), sent_bytes);
+                                error("msg_send failed: Should of sent %lu bytes, but %d were actually sent.\n", strlen(msg), sent_bytes);
                                 running = false;
                             }
                         } else {

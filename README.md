@@ -60,6 +60,9 @@ recvfrom on packet socket
     /* proces ODR message */
     if msg.type == RREQ
         if msg.dstip == thisnode
+            if msg.flags == ODR_RREP_SENT
+                /* Don't RREP */
+                return
             send_rrep() <-------if FORCE_RREQ is set then RREP should as well
         else if complete_route(msg.dstip)
             was_sent = send_rrep()

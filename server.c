@@ -46,6 +46,7 @@ void run_time_server(int unix_socket) {
         error("gethostname failed: %s\n", strerror(errno));
         return;
     }
+    info("server running at node %s\n", myhost);
     while(1) {
         /* msg_recv */
         if((rv = msg_recv(unix_socket, recvbuf, sizeof(recvbuf), ip,
@@ -58,7 +59,8 @@ void run_time_server(int unix_socket) {
         if(!gethostbystr(ip, chost, sizeof(chost))) {
             break;
         }
-        info("server at node %s responding to request from %s", myhost, chost);
+        info("server at node %s responding to request from %s\n", myhost,
+                chost);
         /* Construct a timestamp */
         if ((ticks = time(NULL)) == ((time_t) - 1)) {
             error("time failed: %s\n", strerror(errno));
