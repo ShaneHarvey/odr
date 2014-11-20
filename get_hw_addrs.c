@@ -39,12 +39,17 @@ struct hwa_info *get_hw_addrs(void) {
     hwahead = NULL;
     hwapnext = &hwahead;
     lastname[0] = 0;
-    
+
     ifr = ifc.ifc_req;
     nInterfaces = ifc.ifc_len / sizeof(struct ifreq);
     for(i = 0; i < nInterfaces; i++)  {
         item = &ifr[i];
-         alias = 0; 
+        if(strcmp(item->ifr_name, "lo") == 0 || strcmp(item->ifr_name, "eth0") == 0) {
+            // Skip over the interfaces we dont care about.
+            debug("Skipping hardware device %s\n", item->ifr_name);
+            continue;
+        }
+         alias = 0;
         if((hwa = calloc(1, sizeof(struct hwa_info))) == NULL) {
             goto FREE_BUF;
         }
