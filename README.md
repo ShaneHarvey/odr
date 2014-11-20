@@ -3,6 +3,7 @@ odr
 
 Network Programming Assignment 3
 
+```
 ODR
     interface list
         get_hw_addrs()
@@ -80,7 +81,9 @@ ODR
             /* TDOD: Finish */
         else
             warn invalid message type
+```
 
+```c
 function send_rrep() {
     was_sent = false
     bid_node = bid_lookup(srcip, broadcastid)
@@ -95,3 +98,4 @@ function send_rrep() {
     }
     return was_sent
 }
+```
