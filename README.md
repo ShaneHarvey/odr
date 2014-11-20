@@ -42,10 +42,13 @@ recvfrom on UNIX domain socket
             construct type 2 application payload Ethernet frame
             sendto outgoing interface, MAC from the existing route
         else
-            /* Construct odr_msg and incomplete route entry */
-            add an incomplete entry to the routing table with route.dstip =
-            to the destination address and route.msg_head = odr_msg.
+            /* Construct odr_msg and incomplete route entry 
+             * add an incomplete entry to the routing table with route.dstip =
+             * to the destination address and route.msg_head = odr_msg.
+             */
+            add_incomplete_route()
             /* Next, Broadcast an RREQ out on each interface */
+            broadcast_rreq(all) 
 
 recvfrom on packet socket
     /* Update route table */
@@ -80,14 +83,25 @@ recvfrom on packet socket
              *     else
              *         drop the duplicate RREP msg there is a better RREP
              * else
-             *     append msg to queue
+             *     append msg to this incomplete route's queue
              */
         else if complete_route(msg.dstip)
             /* Do not forward suboptimal RREPs */
         else
             /* No route exists, send RREQ for msg.dstip */
+            add_incomplete_route()
+            broadcast_rreq(all except src_ifindex) 
     else if DATA
-        /* TDOD: Finish */
+        if msg.dstip == thisnode
+            /* send message to destination port (sockaddr_un) */
+        else if incomplete_route(msg.dstip)
+            append msg to this incomplete route's queue
+        else if complete_route(msg.dstip)
+            /* Forward msg along the route */
+        else
+            /* No route exists, send RREQ for msg.dstip */
+            add_incomplete_route()
+            broadcast_rreq(all except src_ifindex) 
     else
         warn invalid message type
 ```
