@@ -137,25 +137,53 @@ void run_odr(int unixsock, int packsock, struct hwa_info *hwahead) {
 
         /* Packet socket is readable */
         if(FD_ISSET(packsock, &rset)) {
-            struct sockaddr_ll lladdr;
-            socklen_t addrlen;
             struct odr_msg recvmsg;
+            struct sockaddr_ll llsrc;
+            socklen_t srclen;
 
             if((nread = recvfrom(unixsock, &recvmsg, sizeof(recvmsg), 0,
-                    (struct sockaddr *)&lladdr, &addrlen)) < 0) {
+                    (struct sockaddr *)&llsrc, &srclen)) < 0) {
                 error("packet socket recv failed: %s\n", strerror(errno));
                 return;
             } else {
                 /* valid API message received */
                 info("ODR received valid packet from packet socket\n");
-                handle_packetmsg(&recvmsg, &lladdr, addrlen);
+                /* Update route table */
+                cleanup_stale(routingTable);
+                /* if FORCE_RREQ then remove_route(dest ip) */
+                /* add_route to source MAC <-------Update if shorter numhops OR same hop but
+                diff ifindex or MAC */
+                /* proces ODR message */
+                switch(recvmsg.type) {
+                    case ODR_RREQ:
+                        process_rreq(&recvmsg, &llsrc, srclen);
+                        break;
+                    case ODR_RREP:
+                        process_rrep(&recvmsg, &llsrc, srclen);
+                        break;
+                    case ODR_DATA:
+                        process_data(&recvmsg, &llsrc, srclen);
+                        break;
+                    default:
+                        warn("Invalid message type %d\n", recvmsg.type);
+                }
             }
         }
     }
 }
 
-int handle_packetmsg(struct odr_msg *recvmsg, struct sockaddr_ll *lladdr,
-        socklen_t addrlen) {
+int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
+        socklen_t srclen) {
+    return 0;
+}
+
+int process_rrep(struct odr_msg *rrep, struct sockaddr_ll *llsrc,
+        socklen_t srclen) {
+    return 0;
+}
+
+int process_data(struct odr_msg *data, struct sockaddr_ll *llsrc,
+        socklen_t srclen) {
     return 0;
 }
 

@@ -73,8 +73,14 @@ struct odr_port {
 
 void run_odr(int unixsock, int rawsock, struct hwa_info *hwahead);
 
-int handle_packetmsg(struct odr_msg *recvmsg, struct sockaddr_ll *lladdr,
-        socklen_t addrlen);
+int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
+        socklen_t srclen);
+
+int process_rrep(struct odr_msg *rrep, struct sockaddr_ll *llsrc,
+        socklen_t srclen);
+
+int process_data(struct odr_msg *data, struct sockaddr_ll *llsrc,
+        socklen_t srclen);
 
 void cleanup_stale(struct route *routingTable);
 
