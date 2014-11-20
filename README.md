@@ -116,7 +116,8 @@ function send_rrep() {
         was_sent = true
     } else if(new_numhops < bid_node->numhops) {
         send RREP message
-        add_bid_node(srcip, broadcastid, new_numhops)
+        /* update to shorter hop number */
+        bid_node = new_numhops 
         was_sent = true
     }
     return was_sent
