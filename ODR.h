@@ -24,6 +24,14 @@ struct route {
     struct route *prev;        /* Previous route in the routing table */
 };
 
+/* This is to check if we have seen this RREQ already */
+struct bid_node {
+    struct in_addr nodeip;     /* ‘canonical’ IP address of the node */
+    int broadcastid;           /* Highest ID seen from broadcast from node */
+    int numhops;               /* numhops sent on the last RREP */
+    struct bid_node* next;     /* Next bid_node in the list */
+};
+
 /* ODR protocol message -- data payload of ethernet frames */
 #define ODR_RREQ 0
 #define ODR_RREP 1
