@@ -39,5 +39,6 @@ struct api_msg {
 
 int copyhostbyaddr(struct in_addr *ip, char *host, size_t hostlen);
 int gethostbystr(char *canonicalIP, char *host, size_t hostlen);
+int getipbyhost(char *hostname, struct in_addr *hostip);
 
 #endif

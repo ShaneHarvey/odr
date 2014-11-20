@@ -3,6 +3,7 @@
 #include "common.h"
 #include "get_hw_addrs.h"
 #include <sys/select.h>
+#include <time.h>
 
 /* Used as the ethernet frame type */
 #define ODR_PROTOCOL 0xF31F
@@ -38,6 +39,10 @@ struct bid_node {
 #define ODR_RREP 1
 #define ODR_DATA 2
 
+#define IS_RREQ(type) ((type) & ODR_RREQ)
+#define IS_RREP(type) ((type) & ODR_RREP)
+#define IS_DATA(type) ((type) & ODR_DATA)
+
 #define ODR_FORCE_RREQ 0x01
 #define ODR_RREP_SENT  0x02
 
@@ -68,6 +73,10 @@ struct odr_port {
 
 void run_odr(int unixsock, int rawsock, struct hwa_info *hwahead);
 
+int handle_packetmsg(struct odr_msg *recvmsg, struct sockaddr_ll *lladdr,
+        socklen_t addrlen);
+
 void cleanup_stale(struct route *routingTable);
+
 
 #endif

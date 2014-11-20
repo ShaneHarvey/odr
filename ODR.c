@@ -1,27 +1,13 @@
 #include "ODR.h"
 
-static char myhost[HOST_NAME_MAX];
-static uint64_t useclim = 1000000L;
+/* Static Globals used by ODR */
 
-static void cleanup(int signum) {
-    /* remove the UNIX socket file */
-    unlink(ODR_PATH);
-    /* 128+n Fatal error signal "n" is the standard Linux exit code */
-    exit(128 + signum);
-}
+static char odrhost[HOST_NAME_MAX];   /* Hostname running ODR, eg vm2 */
+static struct in_addr odraddr;        /* 'Canonical' IP running ODR   */
+static uint64_t route_ttl = 1000000L; /* Route TTL in microseconds    */
 
-static void set_sig_cleanup(void) {
-    struct sigaction sigac_int;
-    /* Zero out memory */
-    memset(&sigac_int, 0, sizeof(sigac_int));
-    /* Set values */
-    sigac_int.sa_handler = &cleanup;
-    /* Set the sigaction */
-    if(sigaction(SIGINT, &sigac_int, NULL) < 0) {
-        error("sigaction failed: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-}
+static void cleanup(int signum);
+static void set_sig_cleanup(void);
 
 int main(int argc, char **argv) {
     int unixsock, packsock;
@@ -52,7 +38,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     } else {
         info("staleness = %f seconds.\n", staleness);
-        useclim = 1000000L * staleness;
+        route_ttl = 1000000L * staleness;
     }
 
     /* Create packet socket to receive only our ODR protocol */
@@ -86,11 +72,18 @@ int main(int argc, char **argv) {
     }
 
     /* Lookup our hostname */
-    if(gethostname(myhost, sizeof(myhost)) < 0) {
+    if(gethostname(odrhost, sizeof(odrhost)) < 0) {
         error("gethostname failed: %s\n", strerror(errno));
         goto FREE_HWA;
     } else {
-        info("ODR running on node %s\n", myhost);
+        info("ODR running on node %s\n", odrhost);
+    }
+
+    /* Lookup our ip address */
+    if(getipbyhost(odrhost, &odraddr)) {
+        debug("ODR running on IP %s\n", inet_ntoa(odraddr));
+    } else {
+        goto FREE_HWA;
     }
 
     /* Start the ODR service */
@@ -146,22 +139,48 @@ void run_odr(int unixsock, int packsock, struct hwa_info *hwahead) {
         if(FD_ISSET(packsock, &rset)) {
             struct sockaddr_ll lladdr;
             socklen_t addrlen;
-            char buf[2048];
+            struct odr_msg recvmsg;
 
-            if((nread = recvfrom(unixsock, buf, sizeof(buf), 0,
+            if((nread = recvfrom(unixsock, &recvmsg, sizeof(recvmsg), 0,
                     (struct sockaddr *)&lladdr, &addrlen)) < 0) {
                 error("packet socket recv failed: %s\n", strerror(errno));
                 return;
             } else {
                 /* valid API message received */
                 info("ODR received valid packet from packet socket\n");
+                handle_packetmsg(&recvmsg, &lladdr, addrlen);
             }
         }
     }
 }
 
+int handle_packetmsg(struct odr_msg *recvmsg, struct sockaddr_ll *lladdr,
+        socklen_t addrlen) {
+    return 0;
+}
+
 void cleanup_stale(struct route *routingTable) {
     if(routingTable != NULL) {
         /* Cleanup */
+    }
+}
+
+static void cleanup(int signum) {
+    /* remove the UNIX socket file */
+    unlink(ODR_PATH);
+    /* 128+n Fatal error signal "n" is the standard Linux exit code */
+    exit(128 + signum);
+}
+
+static void set_sig_cleanup(void) {
+    struct sigaction sigac_int;
+    /* Zero out memory */
+    memset(&sigac_int, 0, sizeof(sigac_int));
+    /* Set values */
+    sigac_int.sa_handler = &cleanup;
+    /* Set the sigaction */
+    if(sigaction(SIGINT, &sigac_int, NULL) < 0) {
+        error("sigaction failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
     }
 }

@@ -1,24 +1,7 @@
 #include "server.h"
 
-static void cleanup(int signum) {
-    /* remove the UNIX socket file */
-    unlink(SERVER_PATH);
-    /* 128+n Fatal error signal "n" is the standard Linux exit code */
-    exit(128 + signum);
-}
-
-static void set_sig_cleanup(void) {
-    struct sigaction sigac_int;
-    /* Zero out memory */
-    memset(&sigac_int, 0, sizeof(sigac_int));
-    /* Set values */
-    sigac_int.sa_handler = &cleanup;
-    /* Set the sigaction */
-    if(sigaction(SIGINT, &sigac_int, NULL) < 0) {
-        error("sigaction failed: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-}
+static void cleanup(int signum);
+static void set_sig_cleanup(void);
 
 int main(int argc, char *argv[]) {
     int unix_socket;
@@ -93,5 +76,25 @@ void run_time_server(int unix_socket) {
                     strerror(errno));
             break;
         }
+    }
+}
+
+static void cleanup(int signum) {
+    /* remove the UNIX socket file */
+    unlink(SERVER_PATH);
+    /* 128+n Fatal error signal "n" is the standard Linux exit code */
+    exit(128 + signum);
+}
+
+static void set_sig_cleanup(void) {
+    struct sigaction sigac_int;
+    /* Zero out memory */
+    memset(&sigac_int, 0, sizeof(sigac_int));
+    /* Set values */
+    sigac_int.sa_handler = &cleanup;
+    /* Set the sigaction */
+    if(sigaction(SIGINT, &sigac_int, NULL) < 0) {
+        error("sigaction failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
     }
 }
