@@ -10,6 +10,7 @@ static int packsock = -1;             /* fd of packet socket             */
 struct hwa_info *hwahead = NULL;      /* List of Hardware Addresses      */
 struct bid_node *bidhead = NULL;      /* List of RREQ broadcast IDS seen */
 struct port_node *porthead = NULL;    /* List of local port allocations  */
+struct route_entry *routehead = NULL; /* Routing Table                   */
 
 int main(int argc, char **argv) {
     struct sockaddr_un unaddr;
@@ -105,7 +106,6 @@ CLOSE_RAW:
 void run_odr(void) {
     int maxfd, nread;
     fd_set rset;
-    struct route_entry *routingTable = NULL;
 
     maxfd = unixsock > packsock ? unixsock + 1 : packsock + 1;
     /* Select on the two sockets forever */
@@ -134,7 +134,7 @@ void run_odr(void) {
             } else {
                 /* valid API message received */
                 info("ODR received valid message from UNIX socket\n");
-                cleanup_stale(routingTable);
+                route_cleanup();
             }
         }
 
@@ -159,7 +159,7 @@ void run_odr(void) {
                 /* valid API message received */
                 info("ODR received valid packet from packet socket\n");
                 /* Update route table */
-                cleanup_stale(routingTable);
+                route_cleanup();
                 /* if FORCE_RREQ then remove_route(dest ip) */
                 /* add_route to source MAC <-------Update if shorter numhops OR same hop but
                 diff ifindex or MAC */
@@ -357,18 +357,75 @@ int send_frame(void *frame_data, int size, char *dst_hwaddr, char *src_hwaddr,
     return 1;
 }
 
+/*
+ * Returns the current timestamp in microseconds. Can not fail.
+ */
+uint64_t usec_ts(void) {
+    struct timespec tp;
+    uint64_t ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+
+    ts = ((uint64_t)tp.tv_sec) * 1000000ULL;
+    ts += ((uint64_t)tp.tv_nsec) / 1000ULL;
+    return ts;
+}
+
 /*********************** BEGIN routing table functions ************************/
 
 /*
  * Search for a route to dest in the routing table and return pointer.
  */
 struct route_entry *route_lookup(struct in_addr dest) {
+    struct route_entry *tmp;
+
+    for(tmp = routehead; tmp != NULL; tmp = tmp->next) {
+        if(tmp->dstip.s_addr == dest.s_addr) {
+            /* found the node! */
+            return tmp;
+        }
+    }
     return NULL;
 }
 
-void cleanup_stale(struct route_entry *routingTable) {
-    if(routingTable != NULL) {
+/*
+ * Removes all stale entries in the routing table.
+ */
+void route_cleanup(void) {
+    uint64_t ts;
+    struct route_entry *cur, *next, *prev;
+
+    /* get the current usec timestamp */
+    ts = usec_ts();
+
+    prev = NULL;
+    cur = routehead;
+    while(cur != NULL) {
+        next = cur->next;
         /* Cleanup */
+        if(ts - cur->ts > route_ttl) {
+            /* remove stale node */
+            if(prev == NULL) {
+                /* we are removing the head */
+                routehead = next;
+            } else {
+                prev->next = next;
+            }
+            free(cur);
+        } else {
+            prev = cur;
+        }
+        cur = next;
+    }
+}
+
+void route_free(void) {
+    struct route_entry *tmp;
+
+    while(routehead != NULL) {
+        tmp = routehead->next;
+        free(routehead);
+        routehead = tmp;
     }
 }
 

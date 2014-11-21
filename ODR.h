@@ -25,7 +25,6 @@ struct route_entry {
     uint64_t ts;               /* Timestamp of the entry */
     struct msg_node *head;     /* Head of a linked list of msgs */
     struct route_entry *next;  /* Next route in the routing table */
-    struct route_entry *prev;  /* Previous route in the routing table */
 };
 
 /* This is to check if we have seen this RREQ already */
@@ -91,9 +90,11 @@ int broadcast_rreq(struct odr_msg *rreq, int src_ifindex);
 int send_frame(void *frame_data, int size, char *dst_hwaddr, char *src_hwaddr,
         int ifi_index);
 
+uint64_t usec_ts(void);
 /*********************** BEGIN routing table functions ************************/
 struct route_entry *route_lookup(struct in_addr dest);
-void cleanup_stale(struct route_entry *routingTable);
+void route_cleanup(void);
+void route_free(void);
 /************************ END routing table functions *************************/
 
 /************************* BEGIN Port Table functions *************************/
