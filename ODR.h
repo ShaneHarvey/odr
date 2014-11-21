@@ -13,6 +13,7 @@
 #define ODR_MAX_STALE 86400.0
 
 #define ODR_MAX_DATA 1470
+#define ODR_MIN_FRAME 34
 
 struct route_entry {
     int complete;              /* true if this route entry is complete */

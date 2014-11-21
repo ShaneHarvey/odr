@@ -142,15 +142,22 @@ void run_odr(void) {
 
         /* Packet socket is readable */
         if(FD_ISSET(packsock, &rset)) {
+            char frame[ETH_FRAME_LEN]; /* MAX ethernet frame length 1514 */
+            /*TODO: Use ethhdr to get original destination MAC */
+            /*struct ethhdr *eh = (struct ethhdr *)frame;*/
             struct odr_msg recvmsg;
             struct sockaddr_ll llsrc;
             socklen_t srclen;
 
-            if((nread = recvfrom(unixsock, &recvmsg, sizeof(recvmsg), 0,
+            if((nread = recvfrom(unixsock, frame, sizeof(frame), 0,
                     (struct sockaddr *)&llsrc, &srclen)) < 0) {
                 error("packet socket recv failed: %s\n", strerror(errno));
                 return;
+            } else if(nread < ODR_MIN_FRAME) {
+                warn("Received ethernet frame too small for ODR.\n");
             } else {
+                /* Copy the frame_data into the odr_msg */
+                memcpy(&recvmsg, frame + ETH_HLEN, nread - ETH_HLEN);
                 /* valid API message received */
                 info("ODR received valid packet from packet socket\n");
                 /* Update route table */
