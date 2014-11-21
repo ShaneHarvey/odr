@@ -93,8 +93,16 @@ int main(int argc, char **argv) {
         goto FREE_HWA;
     }
     info("ODR initial broadcast ID %d\n", broadcastid);
+    /* Init the port table with local server address/port */
+    if((porthead = init_port_table()) == NULL) {
+        goto FREE_HWA;
+    }
     /* Start the ODR service */
     run_odr();
+    /* cleanup stuff if run_odr returns */
+    route_free();
+    port_free();
+    bid_free();
 FREE_HWA:
     free_hwa_info(hwahead);
 CLOSE_UNIX:
@@ -444,11 +452,52 @@ void route_free(void) {
 
 /************************* BEGIN Port Table functions *************************/
 
-struct port_node *port_lookup(int port) {
+/*
+ * Add the well known port, and sockaddr_un of the local instance of the server.
+ */
+struct port_node *init_port_table(void) {
+    struct port_node *serv;
+
+    if((serv = malloc(sizeof(struct port_node))) == NULL) {
+        error("malloc failed: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    /* Copy server UNIX domain socket path */
+    serv->unaddr.sun_family = AF_UNIX;
+    strncpy(serv->unaddr.sun_path, SERVER_PATH,
+            sizeof(serv->unaddr.sun_path) - 1);
+    serv->port = SERVER_PORT;
+    serv->next = NULL;
+    serv->permanent = 1;
+    serv->ts = usec_ts();
+    return serv;
+}
+
+/*
+ * Search for a port_node by port number
+ */
+struct port_node *port_searchbyport(int port) {
     struct port_node *tmp;
 
     for(tmp = porthead; tmp != NULL; tmp = tmp->next) {
         if(tmp->port == port) {
+            /* found the node! */
+            return tmp;
+        }
+    }
+    return NULL;
+}
+
+/*
+ * Search for a port_node by UNIX socket address
+ */
+struct port_node *port_searchbyaddr(struct sockaddr_un *unaddr) {
+    struct port_node *tmp;
+
+    for(tmp = porthead; tmp != NULL; tmp = tmp->next) {
+        if(strncmp(tmp->unaddr.sun_path, unaddr->sun_path,
+                sizeof(unaddr->sun_path)) == 0) {
             /* found the node! */
             return tmp;
         }
@@ -462,7 +511,7 @@ struct port_node *port_lookup(int port) {
  *
  * @return  The newly allocated port or -1 if malloc failed
  */
-int port_add(struct sockaddr_un *addr, socklen_t addrlen) {
+int port_add(struct sockaddr_un *addr) {
     struct port_node *newnode, *cur, *prev;
 
     if((newnode = malloc(sizeof(struct port_node))) == NULL) {
@@ -472,7 +521,6 @@ int port_add(struct sockaddr_un *addr, socklen_t addrlen) {
     }
     /* Init the new node */
     memcpy(&newnode->unaddr, addr, sizeof(struct sockaddr_un));
-    newnode->addrlen = addrlen;
     newnode->port = 0;
     newnode->next = NULL;
 

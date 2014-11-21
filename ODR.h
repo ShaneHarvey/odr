@@ -65,9 +65,9 @@ struct msg_node {
 };
 
 struct port_node {
-    int port;
+    char permanent;            /* True if this entry is permanent */
+    int port;                  /* Port for this UNIX address */
     struct sockaddr_un unaddr; /* The UNIX sockaddr_un */
-    socklen_t addrlen;         /* Length of unaddr */
     uint64_t ts;               /* Timestamp of the entry */
     struct port_node *next;    /* Next port_node in the table */
 };
@@ -99,8 +99,10 @@ void route_free(void);
 /************************ END routing table functions *************************/
 
 /************************* BEGIN Port Table functions *************************/
-struct port_node *port_lookup(int port);
-int port_add(struct sockaddr_un *addr, socklen_t addrlen);
+struct port_node *init_port_table(void);
+struct port_node *port_searchbyport(int port);
+struct port_node *port_searchbyaddr(struct sockaddr_un *unaddr);
+int port_add(struct sockaddr_un *addr);
 void port_free(void);
 /************************** END Port Table functions **************************/
 
