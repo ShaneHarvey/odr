@@ -162,26 +162,31 @@ void run_odr(void) {
             } else {
                 /* Copy the frame_data into the odr_msg */
                 memcpy(&recvmsg, frame + ETH_HLEN, nread - ETH_HLEN);
-                /* valid API message received */
-                info("ODR received valid packet from packet socket\n");
-                /* Update route table */
-                route_cleanup();
-                /* if FORCE_RREQ then remove_route(dest ip) */
-                /* add_route to source MAC <-------Update if shorter numhops OR same hop but
-                diff ifindex or MAC */
-                /* proces ODR message */
-                switch(recvmsg.type) {
-                    case ODR_RREQ:
-                        process_rreq(&recvmsg, &llsrc, srclen);
-                        break;
-                    case ODR_RREP:
-                        process_rrep(&recvmsg, &llsrc, srclen);
-                        break;
-                    case ODR_DATA:
-                        process_data(&recvmsg, &llsrc, srclen);
-                        break;
-                    default:
-                        warn("Invalid message type %d\n", recvmsg.type);
+                if(recvmsg.srcip.s_addr == odrip.s_addr) {
+                    /* Received a message from this ODR */
+                    info("ODR received packet from self.\n");
+                } else {
+                    /* valid API message received */
+                    info("ODR received valid packet from packet socket\n");
+                    /* Update route table */
+                    route_cleanup();
+                    /* if FORCE_RREQ then remove_route(dest ip) */
+                    /* add_route to source MAC <-------Update if shorter numhops OR same hop but
+                    diff ifindex or MAC */
+                    /* proces ODR message */
+                    switch(recvmsg.type) {
+                        case ODR_RREQ:
+                            process_rreq(&recvmsg, &llsrc, srclen);
+                            break;
+                        case ODR_RREP:
+                            process_rrep(&recvmsg, &llsrc, srclen);
+                            break;
+                        case ODR_DATA:
+                            process_data(&recvmsg, &llsrc, srclen);
+                            break;
+                        default:
+                            warn("Invalid message type %d\n", recvmsg.type);
+                    }
                 }
             }
         }
