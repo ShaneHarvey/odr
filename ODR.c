@@ -66,6 +66,12 @@ int main(int argc, char **argv) {
         goto CLOSE_UNIX;
     }
 
+    /* chmod the file to world writable (722) so any process can use ODR  */
+    if(chmod(ODR_PATH, S_IRUSR| S_IWUSR| S_IXUSR | S_IWGRP | S_IWOTH) < 0) {
+        error("chmod failed: %s\n", strerror(errno));
+        goto CLOSE_UNIX;
+    }
+
     /* Find our interfaces */
     if((hwahead = get_hw_addrs()) == NULL) {
         error("Failed to get hardware addresses\n");

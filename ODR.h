@@ -5,6 +5,7 @@
 #include <sys/select.h>
 #include <time.h>
 #include <net/ethernet.h>
+#include <sys/stat.h>
 
 /* Used as the ethernet frame type */
 #define ETH_P_ODR 0xF31F
