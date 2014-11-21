@@ -156,10 +156,11 @@ void run_odr(void) {
         if(FD_ISSET(packsock, &rset)) {
             char frame[ETH_FRAME_LEN]; /* MAX ethernet frame length 1514 */
             /*TODO: Use ethhdr to get original destination MAC */
-            /*struct ethhdr *eh = (struct ethhdr *)frame;*/
+            struct ethhdr *eh = (struct ethhdr *)frame;
             struct odr_msg recvmsg;
             struct sockaddr_ll llsrc;
             socklen_t srclen;
+            int updated;
 
             if((nread = recvfrom(unixsock, frame, sizeof(frame), 0,
                     (struct sockaddr *)&llsrc, &srclen)) < 0) {
@@ -178,9 +179,18 @@ void run_odr(void) {
                     info("ODR received valid packet from packet socket\n");
                     /* Update route table */
                     route_cleanup();
-                    /* if FORCE_RREQ then remove_route(dest ip) */
-                    /* add_route to source MAC <-------Update if shorter numhops OR same hop but
-                    diff ifindex or MAC */
+                    if(recvmsg.flags & ODR_FORCE_RREQ) {
+                        /* if FORCE_RREQ then remove_route(dest ip) */
+                        route_remove(recvmsg.dstip);
+                    }
+                    /* add the route back to source with ifindex/ nxtMAC */
+                    if((updated = route_add_complete(eh->h_source,
+                            recvmsg.srcip, htonl(llsrc.sll_ifindex),
+                            htonl(recvmsg.numhops))) < 0) {
+                        /* failed */
+                        return;
+                    }
+                    info("ODR routing table %s \n", updated? "updated": "did not update");
                     /* proces ODR message */
                     switch(recvmsg.type) {
                         case ODR_RREQ:
@@ -314,10 +324,10 @@ int send_rrep(struct odr_msg *rreq, struct route_entry *route,
  */
 int broadcast_rreq(struct odr_msg *rreq, int src_ifindex) {
     struct hwa_info *cur;
-    char broad_MAC[ETH_ALEN];
+    unsigned char broadmac[ETH_ALEN];
 
     /* Broadcast address is all 0xFF */
-    memset(broad_MAC, 0xFF, sizeof(broad_MAC));
+    memset(broadmac, 0xFF, sizeof(broadmac));
     if(rreq == NULL) {
         error("RREQ cannot be NULL\n");
         return 0;
@@ -326,7 +336,7 @@ int broadcast_rreq(struct odr_msg *rreq, int src_ifindex) {
     for(cur = hwahead; cur != NULL; cur = cur->hwa_next) {
         if(cur->if_index != src_ifindex) {
             /* send ethernet frame to cur->ifindex */
-            if(!send_frame(rreq, ODR_MSG_SIZE(rreq), broad_MAC, cur->if_haddr,
+            if(!send_frame(rreq, ODR_MSG_SIZE(rreq), broadmac, cur->if_haddr,
                     cur->if_index)) {
                 /* send failed */
                 return 0;
@@ -342,8 +352,8 @@ int broadcast_rreq(struct odr_msg *rreq, int src_ifindex) {
  *
  * @return 1 if succeeded 0 if failed
  */
-int send_frame(void *frame_data, int size, char *dst_hwaddr, char *src_hwaddr,
-        int ifi_index) {
+int send_frame(void *frame_data, int size, unsigned char *dst_hwaddr,
+        unsigned char *src_hwaddr, int ifi_index) {
     char frame[ETH_FRAME_LEN]; /* MAX ethernet frame length 1514 */
     struct ethhdr *eh = (struct ethhdr *)frame;
     struct sockaddr_ll dest;
@@ -390,7 +400,123 @@ uint64_t usec_ts(void) {
     return ts;
 }
 
+/*
+ * Returns true if the MAC addresses are equal
+ */
+int samemac(unsigned char *mac1, unsigned char *mac2) {
+    return (memcmp(mac1, mac2, ETH_ALEN) == 0);
+}
+
 /*********************** BEGIN routing table functions ************************/
+
+/*
+ * Adds a complete route entry to the table, or updates an incomplete entry.
+ * If it updates an incomplete entry then it sends out the list of queued
+ * messages for the route.
+ *
+ * @param nxtmac   The MAC address of the next hop on the way to destination ip
+ * @param dstip    The canonical address of the route's eventual destination
+ * @param ifiindex The outgoing interface index in host byte order
+ * @param numhops  The number of hops to the destination in host byte order
+ *
+ * @return 1 if added/updated a route, 0 if did not update, -1 if error
+ */
+int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex,
+        int numhops) {
+    struct route_entry *old;
+    struct hwa_info *hwa_out;
+
+    /* get the info for this interface index */
+    if((hwa_out = hwa_searchbyindex(hwahead, ifindex)) == NULL) {
+        error("Outgoing interface index %d not found!\n", ifindex);
+        return -1;
+    }
+
+    /* Look for an existing route */
+    old = route_lookup(dstip);
+    if(old == NULL) {
+        /* No route exists to the destination yet, so create one */
+        struct route_entry *new;
+        if((new = malloc(sizeof(struct route_entry))) == NULL) {
+            error("malloc failed: %s\n", strerror(errno));
+            return -1;
+        }
+        route_entry_update(new, nxtmac, hwa_out->if_haddr, ifindex, numhops);
+        /* add this new route entry to the route table */
+        new->head = NULL;
+        new->next = routehead;
+        routehead = new;
+    } else if(old->complete) {
+        /* check if this new route is more efficient, or same but different */
+        if(numhops < old->numhops || (numhops == old->numhops &&
+                (!samemac(nxtmac, old->nxtmac) || ifindex != old->if_index))) {
+            /* We need to update this entry */
+            route_entry_update(old, nxtmac, hwa_out->if_haddr, ifindex,numhops);
+        } else {
+            /* Return 0 because we did not update this route */
+            return 0;
+        }
+    } else {
+        struct msg_node *nxt;
+        /* Incomplete route to dstip exists, update it AND send messages */
+        route_entry_update(old, nxtmac, hwa_out->if_haddr, ifindex,numhops);
+        /* Send all the queued messages */
+        for(;old->head != NULL; old->head = nxt) {
+            nxt = old->head->next;
+            debug("Completed route, sending queued messages\n");
+            if(!send_frame(old->head->msg, ODR_MSG_SIZE(old->head->msg),
+                    old->nxtmac, old->outmac, old->if_index)) {
+                /* send failed */
+                return -1;
+            }
+            /* free the memory */
+            free(old->head->msg);
+            free(old->head);
+        }
+    }
+    return 1;
+}
+
+void route_entry_update(struct route_entry *r, unsigned char *nxtmac,
+        unsigned char *outmac, int if_index, int numhops) {
+    /* We need to update this entry */
+    r->complete = 1;
+    r->ts = usec_ts();
+    r->numhops = numhops;
+    r->if_index = if_index;
+    memcpy(r->nxtmac, nxtmac, ETH_ALEN);
+    memcpy(r->outmac, outmac, ETH_ALEN);
+}
+
+/*
+ * Remove the route to dest
+ */
+void route_remove(struct in_addr dest) {
+    struct route_entry *tmp, *prev, *next;
+
+    prev = NULL;
+    for(tmp = routehead; tmp != NULL; tmp = tmp->next) {
+        next = tmp->next;
+        if(tmp->dstip.s_addr == dest.s_addr) {
+            /* Delete the node if it is complete and has no queued messages */
+            if(tmp->complete) {
+                if(tmp->head == NULL) {
+                    debug("Removing route to dest node %s\n", inet_ntoa(dest));
+                    free(tmp);
+                    if(prev == NULL) {
+                        routehead = next;
+                    } else {
+                        prev->next = next;
+                    }
+                } else {
+                    error("Complete route entry has queued messages!\n");
+                }
+            }
+            return;
+        }
+        prev = tmp;
+    }
+}
 
 /*
  * Search for a route to dest in the routing table and return pointer.
@@ -424,13 +550,13 @@ void route_cleanup(void) {
         /* Cleanup */
         if(ts - cur->ts > route_ttl) {
             /* remove stale node */
+            free(cur);
             if(prev == NULL) {
                 /* we are removing the head */
                 routehead = next;
             } else {
                 prev->next = next;
             }
-            free(cur);
         } else {
             prev = cur;
         }

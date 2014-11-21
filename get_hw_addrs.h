@@ -16,7 +16,7 @@
 
 struct hwa_info {
     char    if_name[IFNAMSIZ];   /* interface name, null terminated */
-    char    if_haddr[IFHWADDRLEN]; /* hardware address */
+    unsigned char if_haddr[IFHWADDRLEN]; /* hardware address */
     int     if_index;           /* interface index */
     short   ip_alias;           /* 1 if hwa_addr is an alias IP address */
     struct  sockaddr *ip_addr;  /* IP address */
@@ -27,5 +27,6 @@ struct hwa_info {
 /* function prototypes */
 struct hwa_info *get_hw_addrs();
 void free_hwa_info(struct hwa_info *);
+struct hwa_info *hwa_searchbyindex(struct hwa_info *head, int index);
 
 #endif

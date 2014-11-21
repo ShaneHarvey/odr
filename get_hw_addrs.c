@@ -104,3 +104,14 @@ void free_hwa_info(struct hwa_info *hwahead) {
         free(hwa);            /* the hwa_info{} itself */
     }
 }
+
+struct hwa_info *hwa_searchbyindex(struct hwa_info *head, int index) {
+    struct hwa_info *tmp;
+
+    for(tmp = head; tmp != NULL; tmp = tmp->hwa_next) {
+        if(tmp->if_index == index) {
+            return tmp;
+        }
+    }
+    return NULL;
+}

@@ -19,8 +19,8 @@
 struct route_entry {
     int complete;              /* true if this route entry is complete */
     struct in_addr dstip;      /* ‘canonical’ IP address of the destination */
-    char nxtmac[IFHWADDRLEN];  /* MAC address of next-hop node */
-    char outmac[IFHWADDRLEN];  /* MAC address of outgoing interface index */
+    unsigned char nxtmac[IFHWADDRLEN];/* MAC address of next-hop node */
+    unsigned char outmac[IFHWADDRLEN];/* MAC address of outgoing if index */
     int if_index;              /* Outgoing interface index */
     int numhops;               /* Number of hops to the destination */
     uint64_t ts;               /* Timestamp of the entry */
@@ -88,11 +88,17 @@ int send_rrep(struct odr_msg *rreq, struct route_entry *route,
 
 int broadcast_rreq(struct odr_msg *rreq, int src_ifindex);
 
-int send_frame(void *frame_data, int size, char *dst_hwaddr, char *src_hwaddr,
-        int ifi_index);
+int send_frame(void *frame_data, int size, unsigned char *dst_hwaddr,
+        unsigned char *src_hwaddr, int ifi_index);
 
 uint64_t usec_ts(void);
+int samemac(unsigned char *mac1, unsigned char *mac2);
 /*********************** BEGIN routing table functions ************************/
+int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex,
+        int numhops);
+void route_entry_update(struct route_entry *r, unsigned char *nxtmac,
+        unsigned char *outmac, int if_index, int numhops);
+void route_remove(struct in_addr dest);
 struct route_entry *route_lookup(struct in_addr dest);
 void route_cleanup(void);
 void route_free(void);
