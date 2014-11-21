@@ -90,7 +90,7 @@ int broadcast_rreq(struct odr_msg *rreq, int src_ifindex);
 int send_frame(void *frame_data, int size, char *dst_hwaddr, char *src_hwaddr,
         int ifi_index);
 
-int duplicate_rreq(struct odr_msg *rreq);
+int ignore_rreq(struct odr_msg *rreq);
 
 struct route_entry *route_lookup(struct in_addr dest);
 

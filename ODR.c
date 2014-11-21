@@ -187,7 +187,7 @@ int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
     struct route_entry *srcroute;
 
     /* check if the RREQ is a duplicate */
-    if(duplicate_rreq(rreq)) {
+    if(ignore_rreq(rreq)) {
         warn("duplicate RREQ ignored\n");
         return 0;
     } else {
@@ -353,14 +353,25 @@ int send_frame(void *frame_data, int size, char *dst_hwaddr, char *src_hwaddr,
 }
 
 /*
- * Returns true if this rreq is a duplicate. (Already been processed)
+ * Returns true if this rreq is a duplicate (Already been processed). and the
+ * numhops of rreq is less efficeint than the previous rreq.
+ *
  */
-int duplicate_rreq(struct odr_msg *rreq) {
-    struct bid_node *dup;
+int ignore_rreq(struct odr_msg *rreq) {
+    struct bid_node *prev;
 
-    /* Duplicate RREQ will have the same source and an equal or lower bid */
-    dup = bid_lookup(rreq->srcip);
-    return (dup != NULL && dup->broadcastid >= rreq->broadcastid);
+    /* Previous RREQ will have the same source and an equal or lower bid */
+    prev = bid_lookup(rreq->srcip);
+    if(prev == NULL) {
+        return 0;
+    } else if(prev->broadcastid > rreq->broadcastid) {
+        return 1;
+    } else if(prev->broadcastid == rreq->broadcastid) {
+        /* ignore duplicate RREQs that are  */
+        return prev->numhops <= rreq->numhops;
+    } else {
+        return 0;
+    }
 }
 
 /*
