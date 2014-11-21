@@ -1,17 +1,15 @@
 #include "ODR.h"
 
 /* Static Globals used by ODR, LOTS of em :) */
-
-static char odrhost[HOST_NAME_MAX];   /* Hostname running ODR, eg vm2 */
-static struct in_addr odrip;          /* 'Canonical' IP running ODR   */
-static uint64_t route_ttl = 1000000L; /* Route TTL in microseconds    */
-static int32_t broadcastid = 1;       /* Broadcast ID for next RREQ   */
-static int unixsock = -1;             /* fd of UNIX domain socket     */
-static int packsock = -1;             /* fd of packet socket          */
-struct hwa_info *hwahead;             /* List of Hardware Addresses   */
-
-static void cleanup(int signum);
-static void set_sig_cleanup(void);
+static char odrhost[HOST_NAME_MAX];   /* Hostname running ODR, eg vm2    */
+static struct in_addr odrip;          /* 'Canonical' IP running ODR      */
+static uint64_t route_ttl = 1000000L; /* Route TTL in microseconds       */
+static int32_t broadcastid = 1;       /* Broadcast ID for next RREQ      */
+static int unixsock = -1;             /* fd of UNIX domain socket        */
+static int packsock = -1;             /* fd of packet socket             */
+struct hwa_info *hwahead = NULL;      /* List of Hardware Addresses      */
+struct bid_node *bidhead = NULL;      /* List of RREQ broadcast IDS seen */
+struct port_node *porthead = NULL;    /* List of local port allocations  */
 
 int main(int argc, char **argv) {
     struct sockaddr_un unaddr;
@@ -359,6 +357,141 @@ int send_frame(void *frame_data, int size, char *dst_hwaddr, char *src_hwaddr,
     return 1;
 }
 
+/*********************** BEGIN routing table functions ************************/
+
+/*
+ * Search for a route to dest in the routing table and return pointer.
+ */
+struct route_entry *route_lookup(struct in_addr dest) {
+    return NULL;
+}
+
+void cleanup_stale(struct route_entry *routingTable) {
+    if(routingTable != NULL) {
+        /* Cleanup */
+    }
+}
+
+/************************ END routing table functions *************************/
+
+/************************* BEGIN Port Table functions *************************/
+
+struct port_node *port_lookup(int port) {
+    struct port_node *tmp;
+
+    for(tmp = porthead; tmp != NULL; tmp = tmp->next) {
+        if(tmp->port == port) {
+            /* found the node! */
+            return tmp;
+        }
+    }
+    return NULL;
+}
+
+/*
+ * Add a UNIX domain socket address to the port table. Port table is stored in
+ * increasing port order.
+ *
+ * @return  The newly allocated port or -1 if malloc failed
+ */
+int port_add(struct sockaddr_un *addr, socklen_t addrlen) {
+    struct port_node *newnode, *cur, *prev;
+
+    if((newnode = malloc(sizeof(struct port_node))) == NULL) {
+        /* malloc failed */
+        error("malloc failed: %s\n", strerror(errno));
+        return -1;
+    }
+    /* Init the new node */
+    memcpy(&newnode->unaddr, addr, sizeof(struct sockaddr_un));
+    newnode->addrlen = addrlen;
+    newnode->port = 0;
+    newnode->next = NULL;
+
+    /* Search for the lowest unused port and insert */
+    for(prev = NULL, cur = porthead; cur != NULL; prev = cur, cur = cur->next,
+            newnode->port++) {
+        if(newnode->port < cur->port) {
+            /* add new node here */
+            newnode->next = cur;
+            if(prev == NULL) {
+                /* push onto head of the list */
+                porthead = newnode;
+            } else {
+                prev->next = newnode;
+            }
+            return newnode->port;
+        }
+    }
+    /* Push this node onto the port list */
+    newnode->next = porthead;
+    porthead = newnode;
+    return newnode->port;
+}
+
+/*
+ * Free all the nodes in the port allocation list
+ */
+void port_free(void) {
+    struct port_node *tmp;
+
+    while(porthead != NULL) {
+        tmp = porthead->next;
+        free(porthead);
+        porthead = tmp;
+    }
+}
+
+/************************** END Port Table functions **************************/
+
+/********************* BEGIN Previous RREQ list functions *********************/
+
+struct bid_node *bid_lookup(struct in_addr src) {
+    struct bid_node *tmp;
+
+    for(tmp = bidhead; tmp != NULL; tmp = tmp->next) {
+        if(tmp->srcip.s_addr == src.s_addr) {
+            /* found the node! */
+            return tmp;
+        }
+    }
+    return NULL;
+}
+
+/*
+ * Add a Broadcast ID entry to mark that we have seen this bid from source ip.
+ */
+int bid_add(struct odr_msg *rreq) {
+    struct bid_node *newbid;
+
+    if((newbid = malloc(sizeof(struct bid_node))) == NULL) {
+        /* malloc failed */
+        error("malloc failed: %s\n", strerror(errno));
+        return 0;
+    }
+    /* Init the new node */
+    newbid->srcip.s_addr = rreq->srcip.s_addr;
+    newbid->broadcastid = rreq->broadcastid;
+    newbid->numhops = rreq->numhops;
+    /* Push this node onto the bid list */
+    newbid->next = bidhead;
+    bidhead = newbid;
+    return 1;
+}
+
+/*
+ * Free all the nodes in the bid_node list
+ */
+void bid_free(void) {
+    struct bid_node *tmp;
+
+    while(bidhead != NULL) {
+        tmp = bidhead->next;
+        free(bidhead);
+        bidhead = tmp;
+    }
+}
+
 /*
  * Returns true if this rreq is a duplicate (Already been processed). and the
  * numhops of rreq is less efficeint than the previous rreq.
@@ -381,29 +514,7 @@ int ignore_rreq(struct odr_msg *rreq) {
     }
 }
 
-/*
- * Search for a route to dest in the routing table and return pointer.
- */
-struct route_entry *route_lookup(struct in_addr dest) {
-    return NULL;
-}
-
-void cleanup_stale(struct route_entry *routingTable) {
-    if(routingTable != NULL) {
-        /* Cleanup */
-    }
-}
-
-struct bid_node *bid_lookup(struct in_addr src) {
-    return NULL;
-}
-
-/*
- * Add a Broadcast ID entry to mark that we have seen this bid from source ip.
- */
-void bid_add(struct odr_msg *rreq) {
-    return;
-}
+/********************* END Previous RREQ list functions ***********************/
 
 static void cleanup(int signum) {
     /* remove the UNIX socket file */

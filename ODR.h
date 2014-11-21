@@ -30,7 +30,7 @@ struct route_entry {
 
 /* This is to check if we have seen this RREQ already */
 struct bid_node {
-    struct in_addr nodeip;     /* ‘canonical’ IP address of the node */
+    struct in_addr srcip;     /* ‘canonical’ IP address of the source node */
     int32_t broadcastid;       /* Highest ID seen from broadcast from node */
     int numhops;               /* numhops sent on the last RREP */
     struct bid_node* next;     /* Next bid_node in the list */
@@ -49,14 +49,14 @@ struct bid_node {
 struct odr_msg {
     char type;                /* ODR_RREQ, ODR_RREP, or ODR_DATA  */
     char flags;               /* Bitwise OR of ODR_FORCE_RREQ, ODR_RREP_SENT */
-    struct in_addr srcip;      /* ‘canonical’ IP address of the destination */
-    int32_t srcport;           /* Source port -- assigned by ODR */
-    struct in_addr dstip;      /* ‘canonical’ IP address of the destination */
-    int32_t dstport;           /* Destination port -- read from UNIX socket */
-    int32_t numhops;           /* Hop count (incremented by 1 at each hop) */
-    int32_t broadcastid;       /* Broadcast ID of RREQ */
-    uint32_t dlen;             /* Number of bytes in the data payload */
-    char data[ODR_MAX_DATA];   /* Buffer to hold data */
+    struct in_addr srcip;     /* ‘canonical’ IP address of the destination */
+    int32_t srcport;          /* Source port -- assigned by ODR */
+    struct in_addr dstip;     /* ‘canonical’ IP address of the destination */
+    int32_t dstport;          /* Destination port -- read from UNIX socket */
+    int32_t numhops;          /* Hop count (incremented by 1 at each hop) */
+    int32_t broadcastid;      /* Broadcast ID of RREQ */
+    uint32_t dlen;            /* Number of bytes in the data payload */
+    char data[ODR_MAX_DATA];  /* Buffer to hold data */
 } __attribute__((packed));
 
 struct msg_node {
@@ -64,12 +64,12 @@ struct msg_node {
     struct msg_node *next;     /* Next msg_node that needs to be sent */
 };
 
-struct odr_port {
+struct port_node {
     int port;
     struct sockaddr_un unaddr; /* The UNIX sockaddr_un */
     socklen_t addrlen;         /* Length of unaddr */
     uint64_t ts;               /* Timestamp of the entry */
-    struct odr_port *next;     /* Next odr_port in the table */
+    struct port_node *next;    /* Next port_node in the table */
 };
 
 void run_odr(void);
@@ -91,14 +91,26 @@ int broadcast_rreq(struct odr_msg *rreq, int src_ifindex);
 int send_frame(void *frame_data, int size, char *dst_hwaddr, char *src_hwaddr,
         int ifi_index);
 
-int ignore_rreq(struct odr_msg *rreq);
-
+/*********************** BEGIN routing table functions ************************/
 struct route_entry *route_lookup(struct in_addr dest);
-
 void cleanup_stale(struct route_entry *routingTable);
+/************************ END routing table functions *************************/
 
+/************************* BEGIN Port Table functions *************************/
+struct port_node *port_lookup(int port);
+int port_add(struct sockaddr_un *addr, socklen_t addrlen);
+void port_free(void);
+/************************** END Port Table functions **************************/
+
+/********************* BEGIN Previous RREQ list functions *********************/
 struct bid_node *bid_lookup(struct in_addr src);
+int bid_add(struct odr_msg *rreq);
+void bid_free(void);
+int ignore_rreq(struct odr_msg *rreq);
+/********************* END Previous RREQ list functions ***********************/
 
-void bid_add(struct odr_msg *rreq);
+/* Signal handling for cleanup */
+static void cleanup(int signum);
+static void set_sig_cleanup(void);
 
 #endif
