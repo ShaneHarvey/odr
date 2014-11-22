@@ -154,22 +154,18 @@ void run_odr(void) {
 
         /* Packet socket is readable */
         if(FD_ISSET(packsock, &rset)) {
-            char frame[ETH_FRAME_LEN]; /* MAX ethernet frame length 1514 */
-            struct ethhdr *eh = (struct ethhdr *)frame;
+            struct ethhdr eh;
             struct odr_msg recvmsg;
             struct sockaddr_ll llsrc;
-            socklen_t srclen;
             int updated;
 
-            if((nread = recvfrom(unixsock, frame, sizeof(frame), 0,
-                    (struct sockaddr *)&llsrc, &srclen)) < 0) {
-                error("packet socket recv failed: %s\n", strerror(errno));
+            if((nread = recv_frame(&eh, &recvmsg, &llsrc) < 0)) {
+                /* FAILED */
                 return;
             } else if(nread < ODR_MIN_FRAME) {
                 warn("Received ethernet frame too small for ODR.\n");
             } else {
-                /* Copy the frame_data into the odr_msg */
-                memcpy(&recvmsg, frame + ETH_HLEN, nread - ETH_HLEN);
+                /* Received a valid ODR message */
                 if(recvmsg.srcip.s_addr == odrip.s_addr) {
                     /* Received a message from this ODR */
                     info("ODR received packet from self.\n");
@@ -183,7 +179,7 @@ void run_odr(void) {
                         route_remove(recvmsg.dstip);
                     }
                     /* add the route back to source with ifindex/ nxtMAC */
-                    if((updated = route_add_complete(eh->h_source,
+                    if((updated = route_add_complete(eh.h_source,
                             recvmsg.srcip, htonl(llsrc.sll_ifindex),
                             htonl(recvmsg.numhops))) < 0) {
                         /* failed */
@@ -193,17 +189,17 @@ void run_odr(void) {
                     /* proces ODR message */
                     switch(recvmsg.type) {
                         case ODR_RREQ:
-                            if(!process_rreq(&recvmsg, &llsrc, srclen)){
+                            if(!process_rreq(&recvmsg, &llsrc)){
                                 return;
                             }
                             break;
                         case ODR_RREP:
-                            if(!process_rrep(&recvmsg, &llsrc, srclen)) {
+                            if(!process_rrep(&recvmsg, &llsrc)) {
                                 return;
                             }
                             break;
                         case ODR_DATA:
-                            if(!process_data(&recvmsg, &llsrc, srclen)) {
+                            if(!process_data(&recvmsg, &llsrc)) {
                                 return;
                             }
                             break;
@@ -219,12 +215,10 @@ void run_odr(void) {
 /*
  * @param rreq    Pointer to a valid RREQ type odr_msg
  * @param llsrc   Link layer source address of the RREQ
- * @param srclen  Size of llsrc
  *
  * @return True if succeeded, false if failed
  */
-int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
-        socklen_t srclen) {
+int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc) {
     struct route_entry *srcroute;
 
     /* check if the RREQ is a duplicate */
@@ -271,20 +265,16 @@ int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
 /*
  * @param rrep    Pointer to a valid RREP type odr_msg
  * @param llsrc   Link layer source address of the RREP message
- * @param srclen  Size of llsrc
  */
-int process_rrep(struct odr_msg *rrep, struct sockaddr_ll *llsrc,
-        socklen_t srclen) {
+int process_rrep(struct odr_msg *rrep, struct sockaddr_ll *llsrc) {
     return 0;
 }
 
 /*
  * @param data    Pointer to a valid DATA type odr_msg
  * @param llsrc   Link layer source address of the DATA message
- * @param srclen  Size of llsrc
  */
-int process_data(struct odr_msg *data, struct sockaddr_ll *llsrc,
-        socklen_t srclen) {
+int process_data(struct odr_msg *data, struct sockaddr_ll *llsrc) {
     return 0;
 }
 
@@ -319,8 +309,7 @@ int send_rrep(struct odr_msg *rreq, struct route_entry *route,
     rrep.numhops = hops_to_dst + 1;
 
     /* send the RREP back to the RREQ source */
-    if(!send_frame(&rrep, ODR_MSG_SIZE(&rrep), route->nxtmac, route->outmac,
-            route->if_index)) {
+    if(!send_frame(&rrep, route->nxtmac, route->outmac, route->if_index)) {
         /* send failed */
         return -1;
     }
@@ -350,8 +339,7 @@ int broadcast_rreq(struct odr_msg *rreq, int src_ifindex) {
     for(cur = hwahead; cur != NULL; cur = cur->hwa_next) {
         if(cur->if_index != src_ifindex) {
             /* send ethernet frame to cur->ifindex */
-            if(!send_frame(rreq, ODR_MSG_SIZE(rreq), broadmac, cur->if_haddr,
-                    cur->if_index)) {
+            if(!send_frame(rreq, broadmac, cur->if_haddr, cur->if_index)) {
                 /* send failed */
                 return 0;
             }
@@ -364,14 +352,20 @@ int broadcast_rreq(struct odr_msg *rreq, int src_ifindex) {
  * Construct and send an ethernet frame to the dst_hwaddr MAC from src_hwaddr
  * MAC going out of interface index ifi_index.
  *
+ * @param payload    Pointer to the ODR message to send, in HOST byte order
+ * @param dst_hwaddr The next hop MAC address
+ * @param src_hwaddr The outgoing MAC address
+ * @param ifi_index  The outgoing interface index in HOST byte order
  * @return 1 if succeeded 0 if failed
  */
-int send_frame(void *frame_data, int size, unsigned char *dst_hwaddr,
+int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
         unsigned char *src_hwaddr, int ifi_index) {
     char frame[ETH_FRAME_LEN]; /* MAX ethernet frame length 1514 */
     struct ethhdr *eh = (struct ethhdr *)frame;
     struct sockaddr_ll dest;
-    int nsent;
+    int nsent, size;
+
+    size = ODR_MSG_SIZE(payload);
 
     if(size > ETH_DATA_LEN) {
         error("Frame data too large: %d\n", size);
@@ -381,8 +375,12 @@ int send_frame(void *frame_data, int size, unsigned char *dst_hwaddr,
     memcpy(eh->h_dest, dst_hwaddr, ETH_ALEN);
     memcpy(eh->h_source, src_hwaddr, ETH_ALEN);
     eh->h_proto = htons(ETH_P_ODR);
+    /* Convert payload into NETWORK byte order */
+    hton_msg(payload);
     /* Copy frame data into buffer */
-    memcpy(frame + sizeof(struct ethhdr), frame_data, size);
+    memcpy(frame + sizeof(struct ethhdr), payload, size);
+    /* Convert payload back into HOST byte order */
+    ntoh_msg(payload);
     /* Initialize sockaddr_ll */
     memset(&dest, 0, sizeof(dest));
     dest.sll_family = AF_PACKET;
@@ -398,6 +396,31 @@ int send_frame(void *frame_data, int size, unsigned char *dst_hwaddr,
         return 0;
     }
     return 1;
+}
+
+/*
+ * Receives a ethernet frame and stores the ODR message into recvmsg. Converts
+ * the message into host order as well.
+ * @Return is the same as recvfrom(2)
+ */
+ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
+        struct sockaddr_ll *src) {
+    char frame[ETH_FRAME_LEN]; /* MAX ethernet frame length 1514 */
+    socklen_t srclen;
+    ssize_t nread;
+
+    if((nread = recvfrom(unixsock, frame, sizeof(frame), 0,
+            (struct sockaddr *)src, &srclen)) < 0) {
+        error("packet socket recv failed: %s\n", strerror(errno));
+    } else {
+        /* Copy ethernet frame header into eh */
+        memcpy(eh, frame, ETH_HLEN);
+        /* Copy the frame_data into the odr_msg */
+        memcpy(recvmsg, frame + ETH_HLEN, nread - ETH_HLEN);
+        /* Convert message from Network to Host order */
+        ntoh_msg(recvmsg);
+    }
+    return nread;
 }
 
 /*
@@ -419,6 +442,28 @@ uint64_t usec_ts(void) {
  */
 int samemac(unsigned char *mac1, unsigned char *mac2) {
     return (memcmp(mac1, mac2, ETH_ALEN) == 0);
+}
+
+/*
+ * Converts odr_msg from Host to Network byte order
+ */
+void hton_msg(struct odr_msg *msg) {
+    msg->srcport     = htonl(msg->srcport);
+    msg->dstport     = htonl(msg->dstport);
+    msg->numhops     = htonl(msg->numhops);
+    msg->broadcastid = htonl(msg->broadcastid);
+    msg->dlen        = htonl(msg->dlen);
+}
+
+/*
+ * Converts odr_msg from Network to Host byte order
+ */
+void ntoh_msg(struct odr_msg *msg) {
+    msg->srcport     = ntohl(msg->srcport);
+    msg->dstport     = ntohl(msg->dstport);
+    msg->numhops     = ntohl(msg->numhops);
+    msg->broadcastid = ntohl(msg->broadcastid);
+    msg->dlen        = ntohl(msg->dlen);
 }
 
 /*********************** BEGIN routing table functions ************************/
@@ -478,8 +523,8 @@ int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex,
         for(;old->head != NULL; old->head = nxt) {
             nxt = old->head->next;
             debug("Completed route, sending queued messages\n");
-            if(!send_frame(old->head->msg, ODR_MSG_SIZE(old->head->msg),
-                    old->nxtmac, old->outmac, old->if_index)) {
+            if(!send_frame(old->head->msg, old->nxtmac, old->outmac,
+                    old->if_index)) {
                 /* send failed */
                 return -1;
             }

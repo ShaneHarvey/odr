@@ -74,25 +74,25 @@ struct port_node {
 
 void run_odr(void);
 
-int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
-        socklen_t srclen);
+int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc);
 
-int process_rrep(struct odr_msg *rrep, struct sockaddr_ll *llsrc,
-        socklen_t srclen);
+int process_rrep(struct odr_msg *rrep, struct sockaddr_ll *llsrc);
 
-int process_data(struct odr_msg *data, struct sockaddr_ll *llsrc,
-        socklen_t srclen);
+int process_data(struct odr_msg *data, struct sockaddr_ll *llsrc);
 
 int send_rrep(struct odr_msg *rreq, struct route_entry *route,
         int32_t hops_to_dst);
 
 int broadcast_rreq(struct odr_msg *rreq, int src_ifindex);
 
-int send_frame(void *frame_data, int size, unsigned char *dst_hwaddr,
+int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
         unsigned char *src_hwaddr, int ifi_index);
-
+ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
+        struct sockaddr_ll *src);
 uint64_t usec_ts(void);
 int samemac(unsigned char *mac1, unsigned char *mac2);
+void hton_msg(struct odr_msg *msg);
+void ntoh_msg(struct odr_msg *msg);
 /*********************** BEGIN routing table functions ************************/
 int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex,
         int numhops);
