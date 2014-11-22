@@ -94,6 +94,10 @@ uint64_t usec_ts(void);
 int samemac(unsigned char *mac1, unsigned char *mac2);
 void hton_msg(struct odr_msg *msg);
 void ntoh_msg(struct odr_msg *msg);
+
+void print_frame(struct ethhdr *eh, struct odr_msg *msg);
+void print_mac(unsigned char *mac);
+void print_type(char odr_type);
 /*********************** BEGIN routing table functions ************************/
 int route_add_incomplete(struct in_addr dstip, struct odr_msg *head);
 int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex,
