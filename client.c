@@ -95,8 +95,7 @@ static char* getIpaddress(const char *hostname) {
                 strcpy(ipaddress, cp_ip);
             }
         } else {
-            error("Unable to get host by name.\n");
-            herror("");
+            error("Host name lookup failure.\n");
         }
     }
     return ipaddress;
@@ -178,7 +177,7 @@ int run(int sock_fd) {
                         free(canonicalIP);
                     } else {
                         error("Unable to obtain canonical ipaddress for %s.\n", vm);
-                        running = false;
+                        // running = false;
                     }
                 } else {
                     // Invalid VM Name provided
