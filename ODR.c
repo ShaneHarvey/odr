@@ -157,7 +157,7 @@ void run_odr(void) {
             struct ethhdr eh;
             struct odr_msg recvmsg;
             struct sockaddr_ll llsrc;
-            int updated;
+            int updated, srcindex;
 
             if((nread = recv_frame(&eh, &recvmsg, &llsrc) < 0)) {
                 /* FAILED */
@@ -165,6 +165,7 @@ void run_odr(void) {
             } else if(nread < ODR_MIN_FRAME) {
                 warn("Received ethernet frame too small for ODR.\n");
             } else {
+                srcindex = htonl(llsrc.sll_ifindex);
                 /* Received a valid ODR message */
                 if(recvmsg.srcip.s_addr == odrip.s_addr) {
                     /* Received a message from this ODR */
@@ -189,17 +190,17 @@ void run_odr(void) {
                     /* proces ODR message */
                     switch(recvmsg.type) {
                         case ODR_RREQ:
-                            if(!process_rreq(&recvmsg, &llsrc)){
+                            if(!process_rreq(&recvmsg, srcindex, llsrc.sll_addr)) {
                                 return;
                             }
                             break;
                         case ODR_RREP:
-                            if(!process_rrep(&recvmsg, &llsrc)) {
+                            if(!process_rrep(&recvmsg, srcindex)) {
                                 return;
                             }
                             break;
                         case ODR_DATA:
-                            if(!process_data(&recvmsg, &llsrc)) {
+                            if(!process_data(&recvmsg, srcindex)) {
                                 return;
                             }
                             break;
@@ -213,12 +214,12 @@ void run_odr(void) {
 }
 
 /*
- * @param rreq    Pointer to a valid RREQ type odr_msg
- * @param llsrc   Link layer source address of the RREQ
+ * @param rreq     Pointer to a valid RREQ type odr_msg
+ * @param srcindex Link layer source interface of the RREQ in HOST order
  *
  * @return True if succeeded, false if failed
  */
-int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc) {
+int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac) {
     struct route_entry *srcroute;
 
     /* check if the RREQ is a duplicate */
@@ -247,7 +248,9 @@ int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc) {
         /* Lookup the route to the destination */
         dstroute = route_lookup(rreq->dstip);
 
-        if(dstroute != NULL && dstroute->complete) {
+        /* Check if the route we have goes through the RREQ source */
+        if(dstroute != NULL && dstroute->complete && (!samemac(srcmac,
+                dstroute->nxtmac))) {
             /* dstroute is a complete route to the destination */
             if(send_rrep(rreq, srcroute, dstroute->numhops) < 0) {
                 return 0;
@@ -257,24 +260,54 @@ int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc) {
             /* Continue to broadcast RREQ to everyone except source if_index */
         }
         /* broadcast RREQ to everyone except source if_index */
-        return broadcast_rreq(rreq, llsrc->sll_ifindex);
+        return broadcast_rreq(rreq, srcindex);
     }
     return 1;
 }
 
 /*
  * @param rrep    Pointer to a valid RREP type odr_msg
- * @param llsrc   Link layer source address of the RREP message
+ * @param srcindex Link layer source interface of the RREQ in HOST order
+ *
+ * @return True if succeeded, false if failed
  */
-int process_rrep(struct odr_msg *rrep, struct sockaddr_ll *llsrc) {
+int process_rrep(struct odr_msg *rrep, int srcindex) {
+    struct route_entry *dstroute;
+
+    /* See if we have a route to the destination of RREP */
+    dstroute = route_lookup(rrep->dstip);
+
+    if(rrep->dstip.s_addr == odrip.s_addr) {
+        /* do nothing cause we already added route? */
+    } else if(dstroute == NULL) {
+        /* No route exists, send RREQ for msg.dstip */
+        struct odr_msg rreq;
+        /* build rreq */
+        /* add_incomplete_route(); */
+        broadcast_rreq(&rreq, srcindex);
+    } else if(dstroute->complete) {
+        /* Do not forward suboptimal RREPs */
+    } else {
+        /* incomplete route exists */
+        /* search odr_msg queue for same RREP (src/dst IP the same)
+         * if found
+         *     if found.numhops > msg.numhops
+         *          Update the already queued msg numhops :)
+         *          found.numhops = msg.numhops
+         *     else
+         *         drop the duplicate RREP msg there is a better RREP
+         * else
+         *     append msg to this incomplete route's queue
+         */
+    }
     return 0;
 }
 
 /*
  * @param data    Pointer to a valid DATA type odr_msg
- * @param llsrc   Link layer source address of the DATA message
+ * @param srcindex Link layer source interface of the RREQ in HOST order
  */
-int process_data(struct odr_msg *data, struct sockaddr_ll *llsrc) {
+int process_data(struct odr_msg *data, int srcindex) {
     return 0;
 }
 

@@ -73,12 +73,9 @@ struct port_node {
 };
 
 void run_odr(void);
-
-int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc);
-
-int process_rrep(struct odr_msg *rrep, struct sockaddr_ll *llsrc);
-
-int process_data(struct odr_msg *data, struct sockaddr_ll *llsrc);
+int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac);
+int process_rrep(struct odr_msg *rrep, int srcindex);
+int process_data(struct odr_msg *data, int srcindex);
 
 int send_rrep(struct odr_msg *rreq, struct route_entry *route,
         int32_t hops_to_dst);
