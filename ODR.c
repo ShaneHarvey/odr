@@ -172,7 +172,7 @@ void run_odr(void) {
             } else if(nread < ODR_MIN_FRAME) {
                 warn("Received ethernet frame too small for ODR.\n");
             } else {
-                srcindex = htonl(llsrc.sll_ifindex);
+                srcindex = llsrc.sll_ifindex;
                 /* Received a valid ODR message */
                 if(recvmsg.srcip.s_addr == odrip.s_addr) {
                     /* Received a message from this ODR */
@@ -188,8 +188,7 @@ void run_odr(void) {
                     }
                     /* add the route back to source with ifindex/ nxtMAC */
                     if((updated = route_add_complete(eh.h_source,
-                            recvmsg.srcip, htonl(llsrc.sll_ifindex),
-                            recvmsg.numhops)) < 0) {
+                            recvmsg.srcip, srcindex, recvmsg.numhops)) < 0) {
                         /* failed */
                         return;
                     }
