@@ -72,7 +72,7 @@ void run_time_server(int unix_socket) {
         }
         snprintf(sendbuf, sizeof(sendbuf), "%.24s", timestr);
         /* Send buff to client using msg_send */
-        if ((rv = msg_send(unix_socket, sendbuf, sizeof(sendbuf), ip, port,
+        if ((rv = msg_send(unix_socket, sendbuf, strlen(sendbuf), ip, port,
                 0)) < 0) {
             error("msg_send: returned %d, errno %d: %s\n", rv, errno,
                     strerror(errno));

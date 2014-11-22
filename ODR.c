@@ -140,6 +140,9 @@ void run_odr(void) {
             struct sockaddr_un unaddr;
             socklen_t addrlen;
             struct api_msg recvmsg;
+
+            memset(&unaddr, 0, sizeof(struct sockaddr_un));
+            memset(&recvmsg, 0, sizeof(struct api_msg));
             addrlen = sizeof(struct sockaddr_un);
             if((nread = recvfrom(unixsock, &recvmsg, sizeof(recvmsg), 0,
                     (struct sockaddr *)&unaddr, &addrlen)) < 0) {
@@ -169,6 +172,9 @@ void run_odr(void) {
             struct sockaddr_ll llsrc;
             int updated, srcindex;
 
+            memset(&eh, 0, sizeof(struct ethhdr));
+            memset(&llsrc, 0, sizeof(struct sockaddr_ll));
+            memset(&recvmsg, 0, sizeof(struct odr_msg));
             if((nread = recv_frame(&eh, &recvmsg, &llsrc) < 0)) {
                 /* FAILED */
                 return;
