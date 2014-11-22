@@ -1,7 +1,7 @@
 #include "client.h"
 
 static bool running = false;
-static char temp_name[] = "hw3_tempXXXXXX";
+static char temp_name[] = "/tmp/client_cse533-14.temp.XXXXXX";
 
 int main(int argc, char *argv[]) {
     int success = EXIT_SUCCESS;
@@ -95,8 +95,7 @@ static char* getIpaddress(const char *hostname) {
                 strcpy(ipaddress, cp_ip);
             }
         } else {
-            error("Unable to get host by name.\n");
-            herror("");
+            error("Host name lookup failure.\n");
         }
     }
     return ipaddress;
@@ -178,7 +177,7 @@ int run(int sock_fd) {
                         free(canonicalIP);
                     } else {
                         error("Unable to obtain canonical ipaddress for %s.\n", vm);
-                        running = false;
+                        // running = false;
                     }
                 } else {
                     // Invalid VM Name provided
