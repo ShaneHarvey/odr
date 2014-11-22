@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     } else {
         info("staleness = %f seconds.\n", staleness);
-        route_ttl = 1000000L * staleness;
+        route_ttl = (uint64_t)(1000000ULL * staleness);
     }
 
     /* Create packet socket to receive only our ODR protocol */
@@ -155,7 +155,6 @@ void run_odr(void) {
         /* Packet socket is readable */
         if(FD_ISSET(packsock, &rset)) {
             char frame[ETH_FRAME_LEN]; /* MAX ethernet frame length 1514 */
-            /*TODO: Use ethhdr to get original destination MAC */
             struct ethhdr *eh = (struct ethhdr *)frame;
             struct odr_msg recvmsg;
             struct sockaddr_ll llsrc;
@@ -194,13 +193,19 @@ void run_odr(void) {
                     /* proces ODR message */
                     switch(recvmsg.type) {
                         case ODR_RREQ:
-                            process_rreq(&recvmsg, &llsrc, srclen);
+                            if(!process_rreq(&recvmsg, &llsrc, srclen)){
+                                return;
+                            }
                             break;
                         case ODR_RREP:
-                            process_rrep(&recvmsg, &llsrc, srclen);
+                            if(!process_rrep(&recvmsg, &llsrc, srclen)) {
+                                return;
+                            }
                             break;
                         case ODR_DATA:
-                            process_data(&recvmsg, &llsrc, srclen);
+                            if(!process_data(&recvmsg, &llsrc, srclen)) {
+                                return;
+                            }
                             break;
                         default:
                             warn("Invalid message type %d\n", recvmsg.type);
@@ -215,6 +220,8 @@ void run_odr(void) {
  * @param rreq    Pointer to a valid RREQ type odr_msg
  * @param llsrc   Link layer source address of the RREQ
  * @param srclen  Size of llsrc
+ *
+ * @return True if succeeded, false if failed
  */
 int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
         socklen_t srclen) {
@@ -223,10 +230,13 @@ int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
     /* check if the RREQ is a duplicate */
     if(ignore_rreq(rreq)) {
         warn("duplicate RREQ ignored\n");
-        return 0;
+        return 1;
     } else {
         /* add bid entry to the broadcast id list */
-        bid_add(rreq);
+        if(!bid_add(rreq)) {
+            /* failed to add */
+            return 0;
+        }
     }
 
     /* Lookup the route to the source*/
@@ -234,7 +244,9 @@ int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
 
     if(rreq->dstip.s_addr == odrip.s_addr) {
         /* We are the destination, send an RREP back to the source */
-        send_rrep(rreq, srcroute, 0);
+        if(send_rrep(rreq, srcroute, 0) < 0) {
+            return 0;
+        }
     } else {
         /* We are an intermediate node */
         struct route_entry *dstroute;
@@ -243,13 +255,15 @@ int process_rreq(struct odr_msg *rreq, struct sockaddr_ll *llsrc,
 
         if(dstroute != NULL && dstroute->complete) {
             /* dstroute is a complete route to the destination */
-            send_rrep(rreq, srcroute, dstroute->numhops);
+            if(send_rrep(rreq, srcroute, dstroute->numhops) < 0) {
+                return 0;
+            }
             /* Set the flags for already sent */
             rreq->flags |= ODR_RREP_SENT;
             /* Continue to broadcast RREQ to everyone except source if_index */
         }
         /* broadcast RREQ to everyone except source if_index */
-        broadcast_rreq(rreq, llsrc->sll_ifindex);
+        return broadcast_rreq(rreq, llsrc->sll_ifindex);
     }
     return 1;
 }
