@@ -524,7 +524,7 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
     memcpy(dest.sll_addr, dst_hwaddr, ETH_ALEN);
     dest.sll_halen = ETH_ALEN;
 
-    info("Sending frame TODO: print frame\n");
+    print_frame(eh, payload);
 
     if((nsent = sendto(packsock, frame, size+sizeof(struct ethhdr), 0,
             (struct sockaddr *)&dest, sizeof(dest))) < 0) {
@@ -560,6 +560,37 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
     return nread;
 }
 
+void print_frame(struct ethhdr *eh, struct odr_msg *msg) {
+    /* ODR at node  vm i1 : sending  frame  hdr    src  vm i1      dest  addr
+       ODR msg      type n     src  vm i2      dest  vm i3*/
+    printf("ODR at node %s: sending  frame hdr %s  dest ", odrhost, odrhost);
+    print_mac(eh->h_dest);
+    printf("\n    ODR msg  type ");
+    print_type(msg->type);
+    printf(" src %s", inet_ntoa(msg->srcip));
+    printf(" dest %s\n", inet_ntoa(msg->dstip));
+}
+
+void print_mac(unsigned char *mac) {
+    printf("%hhX:%hhX:%hhX:%hhX:%hhX:%hhX", mac[0], mac[1], mac[2], mac[3],
+            mac[4], mac[5]);
+}
+
+void print_type(char odr_type) {
+    switch(odr_type) {
+        case ODR_RREQ:
+            printf("RREQ");
+            break;
+        case ODR_RREP:
+            printf("RREP");
+            break;
+        case ODR_DATA:
+            printf("DATA");
+            break;
+        default:
+            warn("Invalid message type %d\n", odr_type);
+    }
+}
 /*
  * Returns the current timestamp in microseconds. Can not fail.
  */
