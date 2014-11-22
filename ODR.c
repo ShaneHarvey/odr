@@ -195,7 +195,7 @@ void run_odr(void) {
                             }
                             break;
                         case ODR_RREP:
-                            if(!process_rrep(&recvmsg, srcindex)) {
+                            if(!process_rrep(&recvmsg, srcindex, updated)) {
                                 return;
                             }
                             break;
@@ -266,41 +266,41 @@ int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac) {
 }
 
 /*
- * @param rrep    Pointer to a valid RREP type odr_msg
+ * @param rrep     Pointer to a valid RREP type odr_msg
  * @param srcindex Link layer source interface of the RREQ in HOST order
+ * @param forward  True if we should forward this RREP to the destination
  *
  * @return True if succeeded, false if failed
  */
-int process_rrep(struct odr_msg *rrep, int srcindex) {
+int process_rrep(struct odr_msg *rrep, int srcindex, int forward) {
     struct route_entry *dstroute;
 
     /* See if we have a route to the destination of RREP */
     dstroute = route_lookup(rrep->dstip);
-
+    /* increment the number of hops to the destination */
+    rrep->numhops++;
     if(rrep->dstip.s_addr == odrip.s_addr) {
         /* do nothing cause we already added route? */
     } else if(dstroute == NULL) {
         /* No route exists, send RREQ for msg.dstip */
         struct odr_msg rreq;
         /* build rreq */
+
         /* add_incomplete_route(); */
-        broadcast_rreq(&rreq, srcindex);
+        return broadcast_rreq(&rreq, srcindex);
     } else if(dstroute->complete) {
         /* Do not forward suboptimal RREPs */
+        if(forward) {
+            if(!send_frame(rrep, dstroute->nxtmac, dstroute->outmac,
+                    dstroute->if_index)) {
+                return 0;
+            }
+        }
     } else {
-        /* incomplete route exists */
-        /* search odr_msg queue for same RREP (src/dst IP the same)
-         * if found
-         *     if found.numhops > msg.numhops
-         *          Update the already queued msg numhops :)
-         *          found.numhops = msg.numhops
-         *     else
-         *         drop the duplicate RREP msg there is a better RREP
-         * else
-         *     append msg to this incomplete route's queue
-         */
+        /* incomplete route exists, just add it to the queue */
+        return msgqueue_add(dstroute, rrep);
     }
-    return 0;
+    return 1;
 }
 
 /*
@@ -668,6 +668,53 @@ void route_free(void) {
 
 /************************ END routing table functions *************************/
 
+/*********************** BEGIN message queue functions ************************/
+
+/*
+ * Allocate a msg_node containing a copy of msg to the end of the msg_node list
+ *
+ * @return True if succeeded, False if failed
+ */
+int msgqueue_add(struct route_entry *route, struct odr_msg *msg) {
+    struct msg_node *cur;
+    struct msg_node *new;
+
+    if(msg->type & ODR_RREP) {
+        /* Search for RREP with same dstip/srcip and update numhops */
+        for(cur = route->head; cur != NULL; cur = cur->next) {
+            if(cur->msg->srcip.s_addr == msg->srcip.s_addr &&
+                    cur->msg->dstip.s_addr == msg->dstip.s_addr) {
+                /* Duplicate RREP is already in the queue, update numhops */
+                if(cur->msg->numhops > msg->numhops){
+                    cur->msg->numhops = msg->numhops;
+                }
+                return 1;
+            }
+        }
+    }
+    if((new = malloc(sizeof(struct msg_node))) == NULL) {
+        error("malloc failed: %s\n", strerror(errno));
+        return 0;
+    }
+    if((new->msg = malloc(sizeof(struct odr_msg))) == NULL) {
+        error("malloc failed: %s\n", strerror(errno));
+        return 0;
+    }
+    /* Copy msg into the new node */
+    memcpy(new->msg, msg, sizeof(struct odr_msg));
+    new->next = NULL;
+    /* add new node to the end of the queue */
+    if(route->head == NULL) {
+        route->head = new;
+    } else {
+        for(cur = route->head; cur->next != NULL; cur = cur->next);
+        cur->next = new;
+    }
+    return 1;
+}
+
+/************************ END message queue functions *************************/
+
 /************************* BEGIN Port Table functions *************************/
 
 /*
@@ -854,7 +901,7 @@ static void cleanup(int signum) {
     /* remove the UNIX socket file */
     unlink(ODR_PATH);
     /* 128+n Fatal error signal "n" is the standard Linux exit code */
-    exit(128 + signum);
+    _exit(128 + signum);
 }
 
 static void set_sig_cleanup(void) {

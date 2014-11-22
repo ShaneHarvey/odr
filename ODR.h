@@ -74,7 +74,7 @@ struct port_node {
 
 void run_odr(void);
 int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac);
-int process_rrep(struct odr_msg *rrep, int srcindex);
+int process_rrep(struct odr_msg *rrep, int srcindex, int forward);
 int process_data(struct odr_msg *data, int srcindex);
 
 int send_rrep(struct odr_msg *rreq, struct route_entry *route,
@@ -100,6 +100,10 @@ struct route_entry *route_lookup(struct in_addr dest);
 void route_cleanup(void);
 void route_free(void);
 /************************ END routing table functions *************************/
+
+/*********************** BEGIN message queue functions ************************/
+int msgqueue_add(struct route_entry *route, struct odr_msg *msg);
+/************************ END message queue functions *************************/
 
 /************************* BEGIN Port Table functions *************************/
 struct port_node *init_port_table(void);
