@@ -80,8 +80,7 @@ int process_data(struct odr_msg *data, int srcindex);
 
 int send_rrep(struct odr_msg *rreq, struct route_entry *route,
         int32_t hops_to_dst);
-int build_send_rreq(struct in_addr dstip, struct odr_msg *buffer, int force,
-        int srcindex);
+int build_send_rreq(struct in_addr dstip, int force, int srcindex);
 int broadcast_rreq(struct odr_msg *rreq, int src_ifindex);
 
 void deliver_data(struct odr_msg *data);

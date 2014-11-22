@@ -324,7 +324,8 @@ int process_rrep(struct odr_msg *rrep, int srcindex, int forward) {
         /* do nothing cause we already added route? */
     } else if(dstroute == NULL) {
         /* No route exists, send RREQ for msg.dstip, and buffer RREP */
-        return build_send_rreq(rrep->dstip, rrep, 0, srcindex);
+        return route_add_incomplete(rrep->dstip, rrep) &&
+                build_send_rreq(rrep->dstip, 0, srcindex);
     } else if(dstroute->complete) {
         /* Do not forward suboptimal RREPs */
         if(forward) {
@@ -357,13 +358,20 @@ int process_data(struct odr_msg *data, int srcindex) {
         return 1;
     }else if(dstroute == NULL) {
         /* No route exists, send RREQ for msg.dstip, and buffer RREP */
-        return build_send_rreq(data->dstip, data, 0, srcindex);
+        return route_add_incomplete(data->dstip, data) &&
+                build_send_rreq(data->dstip, 0, srcindex);
     } else if(dstroute->complete) {
         /* Forward msg along the route */
         return send_frame(data, dstroute->nxtmac, dstroute->outmac,
                 dstroute->if_index);
     } else {
         /* incomplete route exists, just add it to the queue */
+        if(data->flags & ODR_FORCE_RREQ) {
+            if(!build_send_rreq(data->dstip, 1, srcindex)) {
+                error("Forced RREQ send failed\n");
+                return 0;
+            }
+        }
         return msgqueue_add(dstroute, data);
     }
 }
@@ -397,11 +405,9 @@ void deliver_data(struct odr_msg *data) {
 /*
  * Construct and send a RREQ for the dstip,
  *
- * @buffer is put on the message queue if it is not NULL
  * @force is the force route rediscovery flag.
  */
-int build_send_rreq(struct in_addr dstip, struct odr_msg *buffer, int force,
-        int srcindex) {
+int build_send_rreq(struct in_addr dstip, int force, int srcindex) {
     struct odr_msg rreq;
     memset(&rreq, 0, sizeof(struct odr_msg));
     rreq.dstip.s_addr = dstip.s_addr;
@@ -413,7 +419,7 @@ int build_send_rreq(struct in_addr dstip, struct odr_msg *buffer, int force,
         rreq.flags = ODR_FORCE_RREQ;
     }
     /* Add route incomplete entry and Broadcast to all nodes */
-    return route_add_incomplete(dstip, NULL) && broadcast_rreq(&rreq, srcindex);
+    return broadcast_rreq(&rreq, srcindex);
 }
 
 /*
@@ -526,6 +532,9 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
     memcpy(dest.sll_addr, dst_hwaddr, ETH_ALEN);
     dest.sll_halen = ETH_ALEN;
 
+    printf("Frame source MAC ");
+    print_mac(src_hwaddr);
+    printf("\n");
     print_frame(eh, payload);
 
     if((nsent = sendto(packsock, frame, size+sizeof(struct ethhdr), 0,
