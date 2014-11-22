@@ -1,7 +1,7 @@
 #include "client.h"
 
 static bool running = false;
-static char temp_name[] = "hw3_tempXXXXXX";
+static char temp_name[] = "/tmp/client_cse533-14.temp.XXXXXX";
 
 int main(int argc, char *argv[]) {
     int success = EXIT_SUCCESS;
