@@ -173,7 +173,7 @@ void run_odr(void) {
                 /* FAILED */
                 return;
             } else if(nread < ODR_MIN_FRAME) {
-                warn("Received ethernet frame too small for ODR.\n");
+                warn("Received %d byte ethernet frame too small for ODR.\n", nread);
             } else {
                 srcindex = llsrc.sll_ifindex;
                 /* Received a valid ODR message */
