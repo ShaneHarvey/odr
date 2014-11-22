@@ -1,4 +1,3 @@
-#include <lber.h>
 #include "ODR.h"
 
 /* Static Globals used by ODR, LOTS of em :) */
