@@ -23,7 +23,7 @@
 #define ODR_PATH     "/tmp/ODR_cse533-14.tmp"
 #define SERVER_PORT 8080
 
-#define MAX_MSGLEN 1024
+#define MAX_MSGLEN 1470
 #define MAX_IPLEN 32
 
 /* Message that the API writes to ODR's UNIX Socket */

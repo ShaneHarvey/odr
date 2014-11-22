@@ -1,4 +1,3 @@
-#include <lber.h>
 #include "ODR.h"
 
 /* Static Globals used by ODR, LOTS of em :) */
@@ -150,6 +149,13 @@ void run_odr(void) {
                 /* valid API message received */
                 info("ODR received valid message from UNIX socket\n");
                 route_cleanup();
+
+                if(!process_unix(&recvmsg, nread, &unaddr)) {
+                    error("failed to process UNIX socket message: %s\n",
+                            strerror(errno));
+                    return;
+                }
+
             }
         }
 
@@ -212,6 +218,37 @@ void run_odr(void) {
             }
         }
     }
+}
+
+int process_unix(struct api_msg *msg, int size, struct sockaddr_un *src) {
+    struct odr_msg data;
+    struct port_node *pn;
+    int sourceport;
+
+    if((pn = port_searchbyaddr(src)) == NULL) {
+        /* Create a port entry if this address is not found */
+        if((sourceport = port_add(src)) < 0) {
+            error("port allocation failed\n");
+            return 0;
+        }
+    } else {
+        /*  Application already has port */
+        sourceport = pn->port;
+    }
+    memset(&data, 0, sizeof(struct odr_msg));
+    data.type = ODR_DATA;
+    data.srcip.s_addr = odrip.s_addr;
+    data.srcport = sourceport;
+    data.dstip.s_addr = msg->ip.s_addr;
+    data.dstport = msg->port;
+    data.flags = msg->flag? ODR_FORCE_RREQ : 0;
+    data.dlen = size - MIN_API_MSG;
+    /* copy application data to the ODR DATA message */
+    memcpy(data.data, msg->msg, data.dlen);
+
+    /* Set numhops to 0 */
+    data.numhops = 0;
+    return process_data(&data, -1); /* -1 because we are the source */
 }
 
 /*
@@ -313,7 +350,9 @@ int process_data(struct odr_msg *data, int srcindex) {
     dstroute = route_lookup(data->dstip);
 
     if(data->dstip.s_addr == odrip.s_addr) {
-        /*TODO: send message to destination port (sockaddr_un) */
+        /* Extract data from ODR DATA message */
+        deliver_data(data);
+        return 1;
     }else if(dstroute == NULL) {
         /* No route exists, send RREQ for msg.dstip, and buffer RREP */
         return build_send_rreq(data->dstip, data, 0, srcindex);
@@ -325,7 +364,32 @@ int process_data(struct odr_msg *data, int srcindex) {
         /* incomplete route exists, just add it to the queue */
         return msgqueue_add(dstroute, data);
     }
-    return 0;
+}
+
+/*
+ * Deliver the odr_data message to the application at this node
+ */
+void deliver_data(struct odr_msg *data) {
+    struct port_node *pn;
+
+    if((pn = port_searchbyport(data->dstport)) == NULL) {
+        warn("No application runnning at port %d!\n", data->dstport);
+    } else {
+        struct api_msg am;
+        am.ip.s_addr = data->dstip.s_addr; /* The source ip of the message */
+        am.port = data->srcport;           /* The source port */
+        memcpy(am.msg, data->data, data->dlen); /* The message */
+        /* Send the message to the application */
+        if(sendto(unixsock, &am, MIN_API_MSG + data->dlen, 0,
+                (struct sockaddr *)&pn->unaddr, sizeof(struct sockaddr_un)) < 0) {
+            error("UNIX socket sendto failed: %s\n", strerror(errno));
+            /* Set this port node ts to 0 so it will be stale */
+            pn->ts = 0;
+        } else {
+            /* Update this time stamp */
+            pn->ts = usec_ts();
+        }
+    }
 }
 
 /*
@@ -340,7 +404,7 @@ int build_send_rreq(struct in_addr dstip, struct odr_msg *buffer, int force,
     memset(&rreq, 0, sizeof(struct odr_msg));
     rreq.dstip.s_addr = dstip.s_addr;
     rreq.srcip.s_addr = odrip.s_addr;
-    rreq.broadcastid = broadcastid++;
+    rreq.broadcastid = broadcastid++; /* Increment the broadcast id */
     rreq.numhops = 1;
     rreq.type = ODR_RREQ;
     if(force) {
@@ -460,7 +524,7 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
     memcpy(dest.sll_addr, dst_hwaddr, ETH_ALEN);
     dest.sll_halen = ETH_ALEN;
 
-    debug("Sending frame TODO: print frame\n");
+    info("Sending frame TODO: print frame\n");
 
     if((nsent = sendto(packsock, frame, size+sizeof(struct ethhdr), 0,
             (struct sockaddr *)&dest, sizeof(dest))) < 0) {
@@ -491,6 +555,7 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
         memcpy(recvmsg, frame + ETH_HLEN, nread - ETH_HLEN);
         /* Convert message from Network to Host order */
         ntoh_msg(recvmsg);
+        info("Received frame TODO: print frame\n");
     }
     return nread;
 }

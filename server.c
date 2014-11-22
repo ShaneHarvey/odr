@@ -70,7 +70,7 @@ void run_time_server(int unix_socket) {
             error("ctime failed: %s\n", strerror(errno));
             break;
         }
-        snprintf(sendbuf, sizeof(sendbuf), "%.24s\r\n", timestr);
+        snprintf(sendbuf, sizeof(sendbuf), "%.24s", timestr);
         /* Send buff to client using msg_send */
         if ((rv = msg_send(unix_socket, sendbuf, sizeof(sendbuf), ip, port,
                 0)) < 0) {

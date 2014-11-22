@@ -143,7 +143,7 @@ int run(int sock_fd) {
                                         int received_port = 0, bytes = 0;
                                         if((bytes = msg_recv(sock_fd, received_msg, sizeof(received_msg),
                                                 received_ip, sizeof(received_ip), &received_port)) > 0) {
-                                            info("client at node %s : received from %s <%s>", this_vm, vm, received_msg);
+                                            info("client at node %s : received from %s <%s>\n", this_vm, vm, received_msg);
                                             // Exit the dowhile loop
                                             break;
                                         } else {

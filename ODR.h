@@ -47,16 +47,16 @@ struct bid_node {
 #define ODR_MSG_SIZE(msgptr) (30 + (msgptr)->dlen)
 
 struct odr_msg {
-    char type;                /* ODR_RREQ, ODR_RREP, or ODR_DATA  */
-    char flags;               /* Bitwise OR of ODR_FORCE_RREQ, ODR_RREP_SENT */
-    struct in_addr srcip;     /* ‘canonical’ IP address of the destination */
-    int32_t srcport;          /* Source port -- assigned by ODR */
-    struct in_addr dstip;     /* ‘canonical’ IP address of the destination */
-    int32_t dstport;          /* Destination port -- read from UNIX socket */
-    int32_t numhops;          /* Hop count (incremented by 1 at each hop) */
-    int32_t broadcastid;      /* Broadcast ID of RREQ */
-    uint32_t dlen;            /* Number of bytes in the data payload */
-    char data[ODR_MAX_DATA];  /* Buffer to hold data */
+    char type;                 /* ODR_RREQ, ODR_RREP, or ODR_DATA  */
+    char flags;                /* Bitwise OR of ODR_FORCE_RREQ, ODR_RREP_SENT */
+    struct in_addr srcip;      /* ‘canonical’ IP address of the destination */
+    int32_t srcport;           /* Source port -- assigned by ODR */
+    struct in_addr dstip;      /* ‘canonical’ IP address of the destination */
+    int32_t dstport;           /* Destination port -- read from UNIX socket */
+    int32_t numhops;           /* Hop count (incremented by 1 at each hop) */
+    int32_t broadcastid;       /* Broadcast ID of RREQ */
+    uint32_t dlen;             /* Number of bytes in the data payload */
+    char data[ODR_MAX_DATA];   /* Buffer to hold data */
 } __attribute__((packed));
 
 struct msg_node {
@@ -73,6 +73,7 @@ struct port_node {
 };
 
 void run_odr(void);
+int process_unix(struct api_msg *msg, int size, struct sockaddr_un *src);
 int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac);
 int process_rrep(struct odr_msg *rrep, int srcindex, int forward);
 int process_data(struct odr_msg *data, int srcindex);
@@ -82,6 +83,8 @@ int send_rrep(struct odr_msg *rreq, struct route_entry *route,
 int build_send_rreq(struct in_addr dstip, struct odr_msg *buffer, int force,
         int srcindex);
 int broadcast_rreq(struct odr_msg *rreq, int src_ifindex);
+
+void deliver_data(struct odr_msg *data);
 
 int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
         unsigned char *src_hwaddr, int ifi_index);
