@@ -140,7 +140,7 @@ void run_odr(void) {
             struct sockaddr_un unaddr;
             socklen_t addrlen;
             struct api_msg recvmsg;
-
+            addrlen = sizeof(struct sockaddr_un);
             if((nread = recvfrom(unixsock, &recvmsg, sizeof(recvmsg), 0,
                     (struct sockaddr *)&unaddr, &addrlen)) < 0) {
                 error("UNIX socket recvfrom failed: %s\n", strerror(errno));
@@ -326,7 +326,7 @@ int process_rrep(struct odr_msg *rrep, int srcindex, int forward) {
     } else if(dstroute == NULL) {
         /* No route exists, send RREQ for msg.dstip, and buffer RREP */
         return route_add_incomplete(rrep->dstip, rrep) &&
-                build_send_rreq(rrep->dstip, 0, srcindex);
+                build_send_rreq(rrep->dstip, rrep->flags, srcindex);
     } else if(dstroute->complete) {
         /* Do not forward suboptimal RREPs */
         if(forward) {
@@ -360,7 +360,7 @@ int process_data(struct odr_msg *data, int srcindex) {
     }else if(dstroute == NULL) {
         /* No route exists, send RREQ for msg.dstip, and buffer RREP */
         return route_add_incomplete(data->dstip, data) &&
-                build_send_rreq(data->dstip, 0, srcindex);
+                build_send_rreq(data->dstip, data->flags, srcindex);
     } else if(dstroute->complete) {
         /* Forward msg along the route */
         return send_frame(data, dstroute->nxtmac, dstroute->outmac,
@@ -387,6 +387,7 @@ void deliver_data(struct odr_msg *data) {
         warn("No application runnning at port %d!\n", data->dstport);
     } else {
         struct api_msg am;
+        memset(&am, 0, sizeof(struct api_msg));
         am.ip.s_addr = data->dstip.s_addr; /* The source ip of the message */
         am.port = data->srcport;           /* The source port */
         memcpy(am.msg, data->data, data->dlen); /* The message */
@@ -509,7 +510,7 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
     struct ethhdr *eh = (struct ethhdr *)frame;
     struct sockaddr_ll dest;
     int nsent, size;
-
+    memset(frame, 0 , ETH_FRAME_LEN);
     size = ODR_MSG_SIZE(payload);
 
     if(size > ETH_DATA_LEN) {
@@ -559,6 +560,7 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
     socklen_t srclen;
     ssize_t nread;
 
+    srclen = sizeof(struct sockaddr_ll);
     if((nread = recvfrom(unixsock, frame, sizeof(frame), 0,
             (struct sockaddr *)src, &srclen)) < 0) {
         error("packet socket recv failed: %s\n", strerror(errno));

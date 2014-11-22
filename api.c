@@ -6,6 +6,9 @@ ssize_t msg_send(int sd, char *msg, size_t msglen, const char *canonicalIP,
     struct sockaddr_un odr_addr;
     struct api_msg sendmsg;
 
+    memset(&odr_addr, 0, sizeof(struct sockaddr_un));
+    memset(&sendmsg, 0, sizeof(struct api_msg));
+
     if(sd < 0 || msg == NULL || canonicalIP == NULL || port < 0 || flag < 0) {
         errno = EINVAL;
         return -1;
@@ -49,6 +52,7 @@ ssize_t msg_recv(int sd, char *msg, size_t msglen, char *canonicalIP,
         size_t iplen, int *port) {
     int recvlen, rmsglen, minlen;
     struct api_msg recvmsg;
+    memset(&recvmsg, 0, sizeof(struct api_msg));
 
     if(sd < 0 || msg == NULL || canonicalIP == NULL || port == NULL) {
         errno = EINVAL;
