@@ -85,7 +85,7 @@ static void cleanup(int signum) {
     /* remove the UNIX socket file */
     unlink(SERVER_PATH);
     /* 128+n Fatal error signal "n" is the standard Linux exit code */
-    exit(128 + signum);
+    _exit(128 + signum);
 }
 
 static void set_sig_cleanup(void) {

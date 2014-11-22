@@ -1,10 +1,10 @@
 #include "client.h"
 
 static bool running = false;
+static char temp_name[] = "hw3_tempXXXXXX";
 
 int main(int argc, char *argv[]) {
     int success = EXIT_SUCCESS;
-    char temp_name[] = "hw3_tempXXXXXX";
     int sock_fd;
     struct sockaddr_un local;
     /* set ctrl-c to remove temp files */
@@ -202,6 +202,8 @@ INVALID_VM:
 }
 
 void intHandler(int signal) {
-    running = false;
-    fclose(stdin);
+    /* Remove the UNIX socket file */
+    unlink(temp_name);
+    /* 128+n Fatal error signal "n" is the standard Linux exit code */
+    _exit(128 + signal);
 }
