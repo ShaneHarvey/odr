@@ -1,3 +1,4 @@
+#include <lber.h>
 #include "ODR.h"
 
 /* Static Globals used by ODR, LOTS of em :) */
@@ -182,7 +183,7 @@ void run_odr(void) {
                     /* add the route back to source with ifindex/ nxtMAC */
                     if((updated = route_add_complete(eh.h_source,
                             recvmsg.srcip, htonl(llsrc.sll_ifindex),
-                            htonl(recvmsg.numhops))) < 0) {
+                            recvmsg.numhops)) < 0) {
                         /* failed */
                         return;
                     }
@@ -221,7 +222,8 @@ void run_odr(void) {
  */
 int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac) {
     struct route_entry *srcroute;
-
+    /* increment the number of hops to the destination */
+    rreq->numhops++;
     /* check if the RREQ is a duplicate */
     if(ignore_rreq(rreq)) {
         warn("duplicate RREQ ignored\n");
@@ -239,7 +241,7 @@ int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac) {
 
     if(rreq->dstip.s_addr == odrip.s_addr) {
         /* We are the destination, send an RREP back to the source */
-        if(send_rrep(rreq, srcroute, 0) < 0) {
+        if(send_rrep(rreq, srcroute, 1) < 0) {
             return 0;
         }
     } else {
@@ -282,12 +284,8 @@ int process_rrep(struct odr_msg *rrep, int srcindex, int forward) {
     if(rrep->dstip.s_addr == odrip.s_addr) {
         /* do nothing cause we already added route? */
     } else if(dstroute == NULL) {
-        /* No route exists, send RREQ for msg.dstip */
-        struct odr_msg rreq;
-        /* build rreq */
-
-        /* add_incomplete_route(); */
-        return broadcast_rreq(&rreq, srcindex);
+        /* No route exists, send RREQ for msg.dstip, and buffer RREP */
+        return build_send_rreq(rrep->dstip, rrep, 0, srcindex);
     } else if(dstroute->complete) {
         /* Do not forward suboptimal RREPs */
         if(forward) {
@@ -308,14 +306,55 @@ int process_rrep(struct odr_msg *rrep, int srcindex, int forward) {
  * @param srcindex Link layer source interface of the RREQ in HOST order
  */
 int process_data(struct odr_msg *data, int srcindex) {
+    struct route_entry *dstroute;
+    /* increment the number of hops to the destination */
+    data->numhops++;
+    /* See if we have a route to the destination of RREP */
+    dstroute = route_lookup(data->dstip);
+
+    if(data->dstip.s_addr == odrip.s_addr) {
+        /*TODO: send message to destination port (sockaddr_un) */
+    }else if(dstroute == NULL) {
+        /* No route exists, send RREQ for msg.dstip, and buffer RREP */
+        return build_send_rreq(data->dstip, data, 0, srcindex);
+    } else if(dstroute->complete) {
+        /* Forward msg along the route */
+        return send_frame(data, dstroute->nxtmac, dstroute->outmac,
+                dstroute->if_index);
+    } else {
+        /* incomplete route exists, just add it to the queue */
+        return msgqueue_add(dstroute, data);
+    }
     return 0;
+}
+
+/*
+ * Construct and send a RREQ for the dstip,
+ *
+ * @buffer is put on the message queue if it is not NULL
+ * @force is the force route rediscovery flag.
+ */
+int build_send_rreq(struct in_addr dstip, struct odr_msg *buffer, int force,
+        int srcindex) {
+    struct odr_msg rreq;
+    memset(&rreq, 0, sizeof(struct odr_msg));
+    rreq.dstip.s_addr = dstip.s_addr;
+    rreq.srcip.s_addr = odrip.s_addr;
+    rreq.broadcastid = broadcastid++;
+    rreq.numhops = 1;
+    rreq.type = ODR_RREQ;
+    if(force) {
+        rreq.flags = ODR_FORCE_RREQ;
+    }
+    /* Add route incomplete entry and Broadcast to all nodes */
+    return route_add_incomplete(dstip, NULL) && broadcast_rreq(&rreq, srcindex);
 }
 
 /*
  * @param rreq         The RREQ message to construct and send an RREP
  * @param route        The route back to the source of the RREQ
  * @param hops_to_dst  The number of hops to the destination of the RREQ
- *                     This should be 0 if we are the destnation.
+ *                     This should be 1 if we are the destination.
  * @return 1 sent. 0 not sent. -1 error.
  */
 int send_rrep(struct odr_msg *rreq, struct route_entry *route,
@@ -339,7 +378,7 @@ int send_rrep(struct odr_msg *rreq, struct route_entry *route,
     rrep.flags = (rreq->flags & ODR_FORCE_RREQ)? ODR_FORCE_RREQ : 0;
     rrep.srcip = rreq->dstip;
     rrep.dstip = rreq->srcip;
-    rrep.numhops = hops_to_dst + 1;
+    rrep.numhops = hops_to_dst;
 
     /* send the RREP back to the RREQ source */
     if(!send_frame(&rrep, route->nxtmac, route->outmac, route->if_index)) {
@@ -501,6 +540,32 @@ void ntoh_msg(struct odr_msg *msg) {
 
 /*********************** BEGIN routing table functions ************************/
 
+int route_add_incomplete(struct in_addr dstip, struct odr_msg *head) {
+    struct route_entry *new;
+
+    if(route_lookup(dstip) != NULL) {
+        error("Trying to add route that already exists!\n");
+        return 0;
+    }
+    if((new = malloc(sizeof(struct route_entry))) == NULL) {
+        error("malloc failed: %s\n", strerror(errno));
+        return 0;
+    }
+
+    memset(new, 0, sizeof(struct route_entry));
+    new->dstip.s_addr = dstip.s_addr;
+    new->complete = 0;
+    new->ts = usec_ts();
+    /* push this entry onto the route table head */
+    new->next = routehead;
+    routehead = new;
+    if(head != NULL){
+        return msgqueue_add(new, head);
+    } else {
+        return 1;
+    }
+}
+
 /*
  * Adds a complete route entry to the table, or updates an incomplete entry.
  * If it updates an incomplete entry then it sends out the list of queued
@@ -626,7 +691,7 @@ struct route_entry *route_lookup(struct in_addr dest) {
 }
 
 /*
- * Removes all stale entries in the routing table.
+ * Removes all stale complete entries in the routing table.
  */
 void route_cleanup(void) {
     uint64_t ts;
@@ -640,7 +705,7 @@ void route_cleanup(void) {
     while(cur != NULL) {
         next = cur->next;
         /* Cleanup */
-        if(ts - cur->ts > route_ttl) {
+        if(ts - cur->ts > route_ttl && cur->complete) {
             /* remove stale node */
             free(cur);
             if(prev == NULL) {

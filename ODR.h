@@ -79,7 +79,8 @@ int process_data(struct odr_msg *data, int srcindex);
 
 int send_rrep(struct odr_msg *rreq, struct route_entry *route,
         int32_t hops_to_dst);
-
+int build_send_rreq(struct in_addr dstip, struct odr_msg *buffer, int force,
+        int srcindex);
 int broadcast_rreq(struct odr_msg *rreq, int src_ifindex);
 
 int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
@@ -91,6 +92,7 @@ int samemac(unsigned char *mac1, unsigned char *mac2);
 void hton_msg(struct odr_msg *msg);
 void ntoh_msg(struct odr_msg *msg);
 /*********************** BEGIN routing table functions ************************/
+int route_add_incomplete(struct in_addr dstip, struct odr_msg *head);
 int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex,
         int numhops);
 void route_entry_update(struct route_entry *r, unsigned char *nxtmac,
