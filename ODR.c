@@ -173,8 +173,9 @@ void run_odr(void) {
                 /* FAILED */
                 return;
             } else if(nread < ODR_MIN_FRAME) {
-                warn("Received %d byte ethernet frame too small for ODR.\n", nread);
+                warn("Received %d byte frame too small for ODR.\n", nread);
             } else {
+                info("Received valid frame TODO: print frame\n");
                 srcindex = llsrc.sll_ifindex;
                 /* Received a valid ODR message */
                 if(recvmsg.srcip.s_addr == odrip.s_addr) {
@@ -541,6 +542,8 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
             (struct sockaddr *)&dest, sizeof(dest))) < 0) {
         error("packet sendto: %s\n", strerror(errno));
         return 0;
+    } else {
+        debug("Send %d bytes, odr msg size:%d\n", nsent, size);
     }
     return 1;
 }
@@ -566,7 +569,6 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
         memcpy(recvmsg, frame + ETH_HLEN, nread - ETH_HLEN);
         /* Convert message from Network to Host order */
         ntoh_msg(recvmsg);
-        info("Received frame TODO: print frame\n");
     }
     return nread;
 }
