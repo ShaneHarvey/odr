@@ -18,7 +18,7 @@ $(LIB): api.o api.h
 	ar -cvq $(LIB) $<
 
 ODR_%: ODR.o common.o get_hw_addrs.o
-	$(CC) -o $@ $^
+	$(CC) -o $@ $^ -lrt
 
 server_%: server.o common.o $(LIB)
 	$(CC) -o $@ $< common.o $(LIBS)
