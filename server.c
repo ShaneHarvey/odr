@@ -41,6 +41,9 @@ void run_time_server(int unix_socket) {
     char myhost[HOST_NAME_MAX], chost[HOST_NAME_MAX], recvbuf[MAX_MSGLEN],
             sendbuf[MAX_MSGLEN], ip[MAX_IPLEN], *timestr;
 
+    memset(sendbuf, 0, MAX_MSGLEN);
+    memset(recvbuf, 0, MAX_MSGLEN);
+    memset(ip, 0, MAX_IPLEN);
     /* Lookup our hostname */
     if(gethostname(myhost, sizeof(myhost)) < 0) {
         error("gethostname failed: %s\n", strerror(errno));
