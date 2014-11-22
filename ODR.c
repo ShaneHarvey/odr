@@ -72,12 +72,6 @@ int main(int argc, char **argv) {
         goto CLOSE_UNIX;
     }
 
-    /* Find our interfaces */
-    if((hwahead = get_hw_addrs()) == NULL) {
-        error("Failed to get hardware addresses\n");
-        goto CLOSE_UNIX;
-    }
-
     /* Lookup our hostname */
     if(gethostname(odrhost, sizeof(odrhost)) < 0) {
         error("gethostname failed: %s\n", strerror(errno));
@@ -86,12 +80,21 @@ int main(int argc, char **argv) {
         info("ODR running on node %s\n", odrhost);
     }
 
-    /* Lookup our ip address */
-    if(getipbyhost(odrhost, &odrip)) {
-        debug("ODR running on IP %s\n", inet_ntoa(odrip));
-    } else {
-        goto FREE_HWA;
+    /* Find our interfaces */
+    odrip.s_addr = 0;
+    if((hwahead = get_hw_addrs(&odrip)) == NULL) {
+        error("Failed to get hardware addresses\n");
+        goto CLOSE_UNIX;
     }
+    /* Hack to make it work without eth0 */
+    if(odrip.s_addr == 0) {
+        /* Lookup our ip address */
+        if(!getipbyhost(odrhost, &odrip)) {
+            goto FREE_HWA;
+        }
+    }
+    debug("ODR running on IP %s\n", inet_ntoa(odrip));
+
     info("ODR initial broadcast ID %d\n", broadcastid);
     /* Init the port table with local server address/port */
     if((porthead = init_port_table()) == NULL) {

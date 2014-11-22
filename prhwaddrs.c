@@ -18,12 +18,12 @@ static char *ntop(struct sockaddr *ip) {
 int main (int argc, char **argv) {
     struct hwa_info *hwa, *hwahead;
     struct sockaddr *sa;
-    char *ptr;
+    unsigned char *ptr;
     int i, prflag;
 
     printf("\n");
 
-    for (hwahead = hwa = get_hw_addrs(); hwa != NULL; hwa = hwa->hwa_next) {
+    for (hwahead = hwa = get_hw_addrs(NULL); hwa != NULL; hwa = hwa->hwa_next) {
         
         printf("%s :%s", hwa->if_name, ((hwa->ip_alias) == IP_ALIAS) ? " (alias)\n" : "\n");
         

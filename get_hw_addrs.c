@@ -1,7 +1,7 @@
 #include "get_hw_addrs.h"
 
 
-struct hwa_info *get_hw_addrs(void) {
+struct hwa_info *get_hw_addrs(struct in_addr *eth0_ip) {
     struct hwa_info    *hwa, *hwahead, **hwapnext;
     int       sockfd, len, lastlen, alias, nInterfaces, i;
     char   *buf, lastname[IFNAMSIZ], *cptr;
@@ -44,7 +44,16 @@ struct hwa_info *get_hw_addrs(void) {
     nInterfaces = ifc.ifc_len / sizeof(struct ifreq);
     for(i = 0; i < nInterfaces; i++)  {
         item = &ifr[i];
-        if(strcmp(item->ifr_name, "lo") == 0 || strcmp(item->ifr_name, "eth0") == 0) {
+        if(strcmp(item->ifr_name, "eth0") == 0) {
+            /* copy IP of eth0 */
+            if(eth0_ip != NULL){
+                eth0_ip->s_addr = ((struct sockaddr_in *)&item->ifr_addr)
+                        ->sin_addr.s_addr;
+            }
+            // Skip over the interfaces we dont care about.
+            debug("Skipping hardware device %s\n", item->ifr_name);
+            continue;
+        }else if(strcmp(item->ifr_name, "lo") == 0) {
             // Skip over the interfaces we dont care about.
             debug("Skipping hardware device %s\n", item->ifr_name);
             continue;

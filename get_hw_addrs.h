@@ -25,7 +25,7 @@ struct hwa_info {
 
 
 /* function prototypes */
-struct hwa_info *get_hw_addrs();
+struct hwa_info *get_hw_addrs(struct in_addr *eth0_ip);
 void free_hwa_info(struct hwa_info *);
 struct hwa_info *hwa_searchbyindex(struct hwa_info *head, int index);
 
