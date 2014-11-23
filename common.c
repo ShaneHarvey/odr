@@ -23,7 +23,7 @@ int gethostbystr(char *canonicalIP, char *host, size_t hostlen) {
         return 0;
     }
     strncpy(host, he->h_name, hostlen);
-    host[hostlen] = '\0';
+    host[hostlen - 1] = '\0';
     return 1;
 }
 
