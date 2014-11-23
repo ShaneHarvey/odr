@@ -259,8 +259,7 @@ int process_unix(struct api_msg *msg, int size, struct sockaddr_un *src) {
 
     /* Set numhops to 0 */
     data.numhops = 0;
-    return process_data(&data, -1, msg->flag); /* -1 because we are the
-    source */
+    return process_data(&data, -1, msg->flag); /* -1 because we are source */
 }
 
 /*
@@ -382,7 +381,7 @@ int process_data(struct odr_msg *data, int srcindex, int force) {
                 dstroute->if_index);
     } else {
         /* incomplete route exists, just add it to the queue */
-        if(data->flags & ODR_FORCE_RREQ) {
+        if(force) {
             if(!build_send_rreq(data->dstip, 1, srcindex)) {
                 error("Forced RREQ send failed\n");
                 return 0;
@@ -800,6 +799,9 @@ void route_entry_update(struct route_entry *r, unsigned char *nxtmac,
  */
 void route_remove(struct in_addr dest) {
     struct route_entry *tmp, *prev, *next;
+    char dsthost[HOST_NAME_MAX];
+
+    gethostbystr(inet_ntoa(dest), dsthost, HOST_NAME_MAX);
 
     prev = NULL;
     for(tmp = routehead; tmp != NULL; tmp = tmp->next) {
@@ -808,7 +810,7 @@ void route_remove(struct in_addr dest) {
             /* Delete the node if it is complete and has no queued messages */
             if(tmp->complete) {
                 if(tmp->head == NULL) {
-                    debug("Removing route to dest node %s\n", inet_ntoa(dest));
+                    info("Removed route to dest node %s\n", dsthost);
                     free(tmp);
                     if(prev == NULL) {
                         routehead = next;
@@ -846,6 +848,7 @@ struct route_entry *route_lookup(struct in_addr dest) {
 void route_cleanup(void) {
     uint64_t ts;
     struct route_entry *cur, *next, *prev;
+    char dsthost[HOST_NAME_MAX];
 
     /* get the current usec timestamp */
     ts = usec_ts();
@@ -857,6 +860,8 @@ void route_cleanup(void) {
         /* Cleanup */
         if(ts - cur->ts > route_ttl && cur->complete) {
             /* remove stale node */
+            gethostbystr(inet_ntoa(cur->dstip), dsthost, HOST_NAME_MAX);
+            info("Removed stale route to dest node %s\n", dsthost);
             free(cur);
             if(prev == NULL) {
                 /* we are removing the head */
