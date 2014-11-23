@@ -39,7 +39,7 @@ void run_time_server(int unix_socket) {
     int rv, port;
     time_t ticks;
     char myhost[HOST_NAME_MAX], chost[HOST_NAME_MAX], recvbuf[MAX_MSGLEN],
-            sendbuf[MAX_MSGLEN], ip[MAX_IPLEN], *timestr;
+            sendbuf[MAX_MSGLEN], ip[MAX_IPLEN], ip_copy[MAX_IPLEN], *timestr;
 
     memset(sendbuf, 0, MAX_MSGLEN);
     memset(recvbuf, 0, MAX_MSGLEN);
@@ -59,9 +59,11 @@ void run_time_server(int unix_socket) {
             break;
         }
         /* Determine client's hostname */
+        strcpy(ip_copy, ip);
         if(!gethostbystr(ip, chost, sizeof(chost))) {
             break;
         }
+
         info("server at node %s responding to request from %s\n", myhost,
                 chost);
         /* Construct a timestamp */
@@ -75,7 +77,7 @@ void run_time_server(int unix_socket) {
         }
         snprintf(sendbuf, sizeof(sendbuf), "%.24s", timestr);
         /* Send buff to client using msg_send */
-        if ((rv = msg_send(unix_socket, sendbuf, strlen(sendbuf), ip, port,
+        if ((rv = msg_send(unix_socket, sendbuf, strlen(sendbuf), ip_copy, port,
                 0)) < 0) {
             error("msg_send: returned %d, errno %d: %s\n", rv, errno,
                     strerror(errno));

@@ -37,7 +37,6 @@ struct api_msg {
 /* The minimum message is an api_msg with 0 bytes of data */
 #define MIN_API_MSG (sizeof(struct api_msg) - MAX_MSGLEN)
 
-int copyhostbyaddr(struct in_addr *ip, char *host, size_t hostlen);
 int gethostbystr(char *canonicalIP, char *host, size_t hostlen);
 int getipbyhost(char *hostname, struct in_addr *hostip);
 

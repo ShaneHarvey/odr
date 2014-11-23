@@ -1,25 +1,6 @@
 #include "common.h"
 
 /*
- * Determine the hostname corresponding to the in_addr and store it into host.
- * @param ip          in_addr address to lookup
- * @param host        Buffer to store the hostname
- * @param hostlen     Size of the the host buffer
- * @return 1 if succeeded, 0 if failed
- */
-int copyhostbyaddr(struct in_addr *ip, char *host, size_t hostlen) {
-    struct hostent *he;
-
-    if((he = gethostbyaddr(ip, sizeof(struct in_addr), AF_INET)) == NULL) {
-        error("gethostbyaddr failed: %s\n", hstrerror(h_errno));
-        return 0;
-    }
-    strncpy(host, he->h_name, hostlen);
-    host[hostlen] = '\0';
-    return 1;
-}
-
-/*
  * Determine the hostname corresponding to the canonicalIP and store it into
  * host.
  * @param canonicalIP IP to lookup eg "130.245.156.22"
@@ -28,25 +9,22 @@ int copyhostbyaddr(struct in_addr *ip, char *host, size_t hostlen) {
  * @return 1 if succeeded, 0 if failed
  */
 int gethostbystr(char *canonicalIP, char *host, size_t hostlen) {
-    int rv;
-    struct in_addr ip;
+    struct hostent *he = NULL;
+    struct in_addr ipv4addr;
 
-    if(host == NULL) {
-        error("host can not be NULL.\n");
-        return 0;
-    }
-    /* Convert IP from presentation to network */
-    if((rv = inet_pton(AF_INET, canonicalIP, &ip)) <= 0) {
-        /* inet_pton failed */
-        error("inet_pton failed: %s\n", strerror(errno));
-        return 0;
-    } else if(rv == 0) {
-        /* canonicalIP is invalid */
-        error("inet_pton failed: canonicalIP is an invalid IPv4 address.\n");
+    if(inet_aton(canonicalIP, &ipv4addr) == 0) {
+        error("inet_aton failed: %s\n", strerror(errno));
         return 0;
     }
 
-    return copyhostbyaddr(&ip, host, hostlen);
+    he = gethostbyaddr(&ipv4addr, sizeof(struct in_addr), AF_INET);
+    if(he == NULL) {
+        error("gethostbyaddr: %s\n", hstrerror(h_errno));
+        return 0;
+    }
+    strncpy(host, he->h_name, hostlen);
+    host[hostlen] = '\0';
+    return 1;
 }
 
 /*

@@ -5,6 +5,7 @@ ssize_t msg_send(int sd, char *msg, size_t msglen, const char *canonicalIP,
     int rv, sendlen;
     struct sockaddr_un odr_addr;
     struct api_msg sendmsg;
+    int nsent;
 
     memset(&odr_addr, 0, sizeof(struct sockaddr_un));
     memset(&sendmsg, 0, sizeof(struct api_msg));
@@ -40,12 +41,19 @@ ssize_t msg_send(int sd, char *msg, size_t msglen, const char *canonicalIP,
     odr_addr.sun_family = AF_UNIX;
     strncpy(odr_addr.sun_path, ODR_PATH, sizeof(odr_addr.sun_path) - 1);
 
-    if(sendto(sd, &sendmsg, sendlen, 0, (struct sockaddr*)&odr_addr,
-            sizeof(odr_addr)) < sendlen) {
+    if((nsent = sendto(sd, &sendmsg, sendlen, 0, (struct sockaddr*)&odr_addr,
+            sizeof(odr_addr))) < 0) {
         /* sendto failed to write all the data */
+        error("API failed to sendto ODR UNIX socket file: %s\n",
+                strerror(errno));
         return -1;
+    } else if(nsent < sendlen) {
+        error("Only %d bytes out of %d were sent\n", nsent, sendlen);
+        return -1;
+    } else {
+        /* return data length to application */
+        return msglen;
     }
-    return msglen;
 }
 
 ssize_t msg_recv(int sd, char *msg, size_t msglen, char *canonicalIP,
@@ -70,9 +78,7 @@ ssize_t msg_recv(int sd, char *msg, size_t msglen, char *canonicalIP,
     }
 
     /* parse IP */
-    if(inet_ntop(AF_INET, &recvmsg.ip, canonicalIP, iplen) == NULL) {
-        return -1;
-    }
+    sprintf(canonicalIP, "%s", inet_ntoa(recvmsg.ip));
     /* Copy port */
     *port = recvmsg.port;
     /* Copy message and null-terminate */
