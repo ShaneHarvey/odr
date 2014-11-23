@@ -153,7 +153,6 @@ void run_odr(void) {
                 warn("Ignoring short message from UNIX socket\n");
             } else {
                 /* valid API message received */
-                info("ODR received valid message from UNIX socket\n");
                 route_cleanup();
                 if(recvmsg.flag) {
                     /* if FORCE_RREQ then remove_route(dest ip) */
@@ -557,9 +556,6 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
     dest.sll_halen = ETH_ALEN;
     dest.sll_protocol = htons(ETH_P_ODR);
 
-    printf("Frame ifindex %d source MAC ", ifi_index);
-    print_mac(src_hwaddr);
-    printf("\n");
     print_frame(eh, payload);
 
     if((nsent = sendto(packsock, frame, size+sizeof(struct ethhdr), 0,
@@ -568,8 +564,6 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
         return 0;
     } else {
         debug("Send %d bytes, odr msg size:%d\n", nsent, size);
-        info("Sent ");
-        print_odrmsg(payload);
     }
     return 1;
 }
@@ -615,17 +609,14 @@ void print_odrmsg(struct odr_msg *msg) {
             (msg->flags & (ODR_FORCE_RREQ | ODR_RREP_SENT))? "":"NONE");
 
     if(msg->type & ODR_DATA) {
-        printf("src: %s srcport:%d dst: %s dstport:%d\n", srchost,
-                msg->srcport, dsthost, msg->dstport);
-        printf("numhops: %"PRId32" broadcastid: %"PRId32" dlen: %"PRIu32"\n",
-                msg->numhops, msg->broadcastid, msg->dlen);
+        printf("src: %s srcport:%d dst: %s dstport:%d numhops: %"PRId32
+                        "broadcastid: %"PRId32" dlen: %"PRIu32"\n", srchost,
+                msg->srcport, dsthost, msg->dstport, msg->numhops,
+                msg->broadcastid, msg->dlen);
     } else {
-        printf("src: %s dst: %s\n", srchost, dsthost);
-        printf("numhops: %"PRId32" broadcastid: %"PRId32"\n", msg->numhops,
-                msg->broadcastid);
+        printf("src: %s dst: %s numhops: %"PRId32" broadcastid: %"PRId32"\n",
+                srchost, dsthost, msg->numhops, msg->broadcastid);
     }
-
-
 }
 
 void print_frame(struct ethhdr *eh, struct odr_msg *msg) {
@@ -637,10 +628,8 @@ void print_frame(struct ethhdr *eh, struct odr_msg *msg) {
     gethostbystr(inet_ntoa(msg->dstip), dsthost, HOST_NAME_MAX);
     printf("ODR at node %s: sending  frame hdr %s  dest ", odrhost, odrhost);
     print_mac(eh->h_dest);
-    printf("\n    ODR msg  type ");
-    print_type(msg->type);
-    printf(" src %s", srchost);
-    printf(" dest %s\n", dsthost);
+    printf("\n");
+    print_odrmsg(msg);
 }
 
 void print_mac(unsigned char *mac) {
