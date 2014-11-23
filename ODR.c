@@ -134,12 +134,14 @@ void run_odr(void) {
             error("select failed: %s\n", strerror(errno));
             return;
         }
+        debug("Select returned\n");
 
         /* UNIX socket is readable */
         if(FD_ISSET(unixsock, &rset)) {
             struct sockaddr_un unaddr;
             socklen_t addrlen;
             struct api_msg recvmsg;
+            debug("UNIX socket is readable.\n");
 
             memset(&unaddr, 0, sizeof(struct sockaddr_un));
             memset(&recvmsg, 0, sizeof(struct api_msg));
@@ -171,6 +173,7 @@ void run_odr(void) {
             struct odr_msg recvmsg;
             struct sockaddr_ll llsrc;
             int updated, srcindex;
+            debug("Packet socket is readable.\n");
 
             memset(&eh, 0, sizeof(struct ethhdr));
             memset(&llsrc, 0, sizeof(struct sockaddr_ll));
@@ -567,7 +570,7 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
     ssize_t nread;
 
     srclen = sizeof(struct sockaddr_ll);
-    if((nread = recvfrom(unixsock, frame, sizeof(frame), 0,
+    if((nread = recvfrom(packsock, frame, sizeof(frame), 0,
             (struct sockaddr *)src, &srclen)) < 0) {
         error("packet socket recv failed: %s\n", strerror(errno));
     } else {
@@ -593,8 +596,8 @@ void print_frame(struct ethhdr *eh, struct odr_msg *msg) {
 }
 
 void print_mac(unsigned char *mac) {
-    printf("%hhX:%hhX:%hhX:%hhX:%hhX:%hhX", mac[0], mac[1], mac[2], mac[3],
-            mac[4], mac[5]);
+    printf("%2hhX:%2hhX:%2hhX:%2hhX:%2hhX:%2hhX", mac[0], mac[1], mac[2],
+            mac[3], mac[4], mac[5]);
 }
 
 void print_type(char odr_type) {
