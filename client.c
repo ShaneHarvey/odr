@@ -111,7 +111,10 @@ int run(int sock_fd) {
         if(fgets(buffer, BUFFER_SIZE, stdin) != NULL) {
             int len = strlen(buffer);
             // Remove the newline from the string
-            if(buffer[len - 1] == '\n') {
+            if(len == 1) {
+                    /* User just pressed empty enter */
+                    continue;
+            } else if(buffer[len - 1] == '\n') {
                 buffer[len - 1] = '\0';
             }
             // See if we have a VM
