@@ -570,7 +570,7 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
     ssize_t nread;
 
     srclen = sizeof(struct sockaddr_ll);
-    if((nread = recvfrom(packsock, frame, sizeof(frame), 0,
+    if((nread = recvfrom(packsock, frame, ETH_FRAME_LEN, 0,
             (struct sockaddr *)src, &srclen)) < 0) {
         error("packet socket recv failed: %s\n", strerror(errno));
     } else {
@@ -596,7 +596,7 @@ void print_frame(struct ethhdr *eh, struct odr_msg *msg) {
 }
 
 void print_mac(unsigned char *mac) {
-    printf("%2hhX:%2hhX:%2hhX:%2hhX:%2hhX:%2hhX", mac[0], mac[1], mac[2],
+    printf("%02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX", mac[0], mac[1], mac[2],
             mac[3], mac[4], mac[5]);
 }
 
