@@ -401,6 +401,8 @@ void deliver_data(struct odr_msg *data) {
         am.port = data->srcport;           /* The source port */
         memcpy(am.msg, data->data, data->dlen); /* The message */
         /* Send the message to the application */
+        debug("Delivering DATA to port %d, path %s from %s:%d\n", data->dstport,
+                pn->unaddr.sun_path, inet_ntoa(am.ip), am.port);
         if(sendto(unixsock, &am, MIN_API_MSG + data->dlen, 0,
                 (struct sockaddr *)&pn->unaddr, sizeof(struct sockaddr_un)) < 0) {
             error("UNIX socket sendto failed: %s\n", strerror(errno));
