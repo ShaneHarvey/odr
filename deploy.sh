@@ -1,5 +1,5 @@
 #!/bin/bash
-
+MINIX=130.245.156.19
 SRC=$(ls *.c *.h Makefile)
-scp $SRC minix:/home/courses/cse533/students/cse533-14/cse533/
-ssh minix "cd cse533 && make clean && make debug && ./deploy_app ODR_cse533-14 client_cse533-14 server_cse533-14"
+scp $SRC cse533-$1@$MINIX:/home/courses/cse533/students/cse533-$1/cse533/
+ssh cse533-$1@$MINIX "cd cse533 && make clean && make debug USER=cse533-$1 && ./deploy_app ODR_cse533-$1 client_cse533-$1 server_cse533-$1"
