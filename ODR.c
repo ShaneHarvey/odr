@@ -213,7 +213,7 @@ void run_odr(void) {
                             }
                             break;
                         case ODR_RREP:
-                            if(!process_rrep(&recvmsg, srcindex)) {
+                            if(!process_rrep(&recvmsg, srcindex, updated)) {
                                 return;
                             }
                             break;
@@ -266,7 +266,7 @@ int process_unix(struct api_msg *msg, int size, struct sockaddr_un *src) {
  * @param rreq     Pointer to a valid RREQ type odr_msg
  * @param srcindex Link layer source interface of the RREQ in HOST order
  * @param srcmac     The source mac address of the RREQ
- * @param efficient  True if the RREP gave us a more efficient route to Source
+ * @param efficient  True if the RREQ gave us a more efficient route to Source
  *
  * @return True if succeeded, false if failed
  */
@@ -324,10 +324,11 @@ int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac, int 
 /*
  * @param rrep       Pointer to a valid RREP type odr_msg
  * @param srcindex   Link layer source interface of the RREQ in HOST order
+ * @param efficient  True if the RREP gave us a more efficient route to Source
  *
  * @return True if succeeded, false if failed
  */
-int process_rrep(struct odr_msg *rrep, int srcindex) {
+int process_rrep(struct odr_msg *rrep, int srcindex, int efficient) {
     struct route_entry *dstroute;
 
     /* See if we have a route to the destination of RREP */
@@ -342,7 +343,7 @@ int process_rrep(struct odr_msg *rrep, int srcindex) {
                 build_send_rreq(rrep->dstip, rrep->flags, srcindex);
     } else if(dstroute->complete) {
         /* Do not forward suboptimal RREPs */
-        if(dstroute->numhops > rrep->numhops) {
+        if(efficient) {
             if(!send_frame(rrep, dstroute->nxtmac, dstroute->outmac,
                     dstroute->if_index)) {
                 return 0;
@@ -602,24 +603,44 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg, struct sockaddr_l
 }
 
 void print_odrmsg(struct odr_msg *msg) {
+    char  srchost[HOST_NAME_MAX], dsthost[HOST_NAME_MAX];
+
+    gethostbystr(inet_ntoa(msg->srcip), srchost, HOST_NAME_MAX);
+    gethostbystr(inet_ntoa(msg->dstip), dsthost, HOST_NAME_MAX);
+
     printf("ODR msg: ");
     print_type(msg->type);
-    printf(" flags: 0x%02hhX\n", msg->flags);
-    printf("src: %s:%d ", inet_ntoa(msg->srcip), msg->srcport);
-    printf("dst: %s:%d\n", inet_ntoa(msg->dstip), msg->dstport);
-    printf("numhops: %"PRId32" broadcastid: %"PRId32" dlen: %"PRIu32"\n",
-            msg->numhops, msg->broadcastid, msg->dlen);
+    printf(" flags: %s%s%s\n", (msg->flags & ODR_FORCE_RREQ)? "FORCE ":"",
+            (msg->flags & ODR_RREP_SENT)? "RREP_SENT":"",
+            (msg->flags & (ODR_FORCE_RREQ | ODR_RREP_SENT))? "":"NONE");
+
+    if(msg->type & ODR_DATA) {
+        printf("src: %s srcport:%d dst: %s dstport:%d\n", srchost,
+                msg->srcport, dsthost, msg->dstport);
+        printf("numhops: %"PRId32" broadcastid: %"PRId32" dlen: %"PRIu32"\n",
+                msg->numhops, msg->broadcastid, msg->dlen);
+    } else {
+        printf("src: %s dst: %s\n", srchost, dsthost);
+        printf("numhops: %"PRId32" broadcastid: %"PRId32"\n", msg->numhops,
+                msg->broadcastid);
+    }
+
+
 }
 
 void print_frame(struct ethhdr *eh, struct odr_msg *msg) {
     /* ODR at node  vm i1 : sending  frame  hdr    src  vm i1      dest  addr
        ODR msg      type n     src  vm i2      dest  vm i3*/
+    char  srchost[HOST_NAME_MAX], dsthost[HOST_NAME_MAX];
+
+    gethostbystr(inet_ntoa(msg->srcip), srchost, HOST_NAME_MAX);
+    gethostbystr(inet_ntoa(msg->dstip), dsthost, HOST_NAME_MAX);
     printf("ODR at node %s: sending  frame hdr %s  dest ", odrhost, odrhost);
     print_mac(eh->h_dest);
     printf("\n    ODR msg  type ");
     print_type(msg->type);
-    printf(" src %s", inet_ntoa(msg->srcip));
-    printf(" dest %s\n", inet_ntoa(msg->dstip));
+    printf(" src %s", srchost);
+    printf(" dest %s\n", dsthost);
 }
 
 void print_mac(unsigned char *mac) {
