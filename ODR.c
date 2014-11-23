@@ -208,17 +208,17 @@ void run_odr(void) {
                     /* proces ODR message */
                     switch(recvmsg.type) {
                         case ODR_RREQ:
-                            if(!process_rreq(&recvmsg, srcindex, llsrc.sll_addr)) {
+                            if(!process_rreq(&recvmsg, srcindex, llsrc.sll_addr, updated)) {
                                 return;
                             }
                             break;
                         case ODR_RREP:
-                            if(!process_rrep(&recvmsg, srcindex, updated)) {
+                            if(!process_rrep(&recvmsg, srcindex)) {
                                 return;
                             }
                             break;
                         case ODR_DATA:
-                            if(!process_data(&recvmsg, 0, srcindex)) {
+                            if(!process_data(&recvmsg, srcindex, 0)) {
                                 return;
                             }
                             break;
@@ -259,22 +259,25 @@ int process_unix(struct api_msg *msg, int size, struct sockaddr_un *src) {
 
     /* Set numhops to 0 */
     data.numhops = 0;
-    return process_data(&data, msg->flag, -1); /* -1 because we are the source */
+    return process_data(&data, -1, msg->flag); /* -1 because we are the
+    source */
 }
 
 /*
  * @param rreq     Pointer to a valid RREQ type odr_msg
  * @param srcindex Link layer source interface of the RREQ in HOST order
+ * @param srcmac     The source mac address of the RREQ
+ * @param efficient  True if the RREP gave us a more efficient route to Source
  *
  * @return True if succeeded, false if failed
  */
-int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac) {
+int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac, int efficient) {
     struct route_entry *srcroute;
     /* increment the number of hops to the destination */
     rreq->numhops++;
     /* check if the RREQ is a duplicate */
     if(ignore_rreq(rreq)) {
-        warn("duplicate RREQ ignored\n");
+        warn("Duplicate inefficient RREQ ignored\n");
         return 1;
     } else {
         /* add bid entry to the broadcast id list */
@@ -298,31 +301,34 @@ int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac) {
         /* Lookup the route to the destination */
         dstroute = route_lookup(rreq->dstip);
 
-        /* Check if the route we have goes through the RREQ source */
-        if(dstroute != NULL && dstroute->complete && (!samemac(srcmac,
-                dstroute->nxtmac))) {
+        /* Samemac ensures that we don't go back an forth forever */
+        if(dstroute == NULL || !dstroute->complete || samemac(srcmac,
+                dstroute->nxtmac)) {
+            /* broadcast RREQ to everyone except source if_index */
+            return broadcast_rreq(rreq, srcindex);
+        } else {
             /* dstroute is a complete route to the destination */
             if(send_rrep(rreq, srcroute, dstroute->numhops) < 0) {
                 return 0;
             }
-            /* Set the flags for already sent */
-            rreq->flags |= ODR_RREP_SENT;
-            /* Continue to broadcast RREQ to everyone except source if_index */
+            if(efficient) {
+                /* Continue to broadcast RREQ, but with already sent flag */
+                rreq->flags |= ODR_RREP_SENT;
+                /* broadcast RREQ to everyone except source if_index */
+                return broadcast_rreq(rreq, srcindex);
+            }
         }
-        /* broadcast RREQ to everyone except source if_index */
-        return broadcast_rreq(rreq, srcindex);
     }
     return 1;
 }
 
 /*
- * @param rrep     Pointer to a valid RREP type odr_msg
- * @param srcindex Link layer source interface of the RREQ in HOST order
- * @param forward  True if we should forward this RREP to the destination
+ * @param rrep       Pointer to a valid RREP type odr_msg
+ * @param srcindex   Link layer source interface of the RREQ in HOST order
  *
  * @return True if succeeded, false if failed
  */
-int process_rrep(struct odr_msg *rrep, int srcindex, int forward) {
+int process_rrep(struct odr_msg *rrep, int srcindex) {
     struct route_entry *dstroute;
 
     /* See if we have a route to the destination of RREP */
@@ -337,7 +343,7 @@ int process_rrep(struct odr_msg *rrep, int srcindex, int forward) {
                 build_send_rreq(rrep->dstip, rrep->flags, srcindex);
     } else if(dstroute->complete) {
         /* Do not forward suboptimal RREPs */
-        if(forward) {
+        if(dstroute->numhops > rrep->numhops) {
             if(!send_frame(rrep, dstroute->nxtmac, dstroute->outmac,
                     dstroute->if_index)) {
                 return 0;
@@ -355,7 +361,7 @@ int process_rrep(struct odr_msg *rrep, int srcindex, int forward) {
  * @param srcindex Link layer source interface of the RREQ in HOST order
  * @param force    True to force RREQ
  */
-int process_data(struct odr_msg *data, int force, int srcindex) {
+int process_data(struct odr_msg *data, int srcindex, int force) {
     struct route_entry *dstroute;
     /* increment the number of hops to the destination */
     data->numhops++;
@@ -446,8 +452,7 @@ int build_send_rreq(struct in_addr dstip, int force, int srcindex) {
  *                     This should be 1 if we are the destination.
  * @return 1 sent. 0 not sent. -1 error.
  */
-int send_rrep(struct odr_msg *rreq, struct route_entry *route,
-        int32_t hops_to_dst) {
+int send_rrep(struct odr_msg *rreq, struct route_entry *route, int32_t hops_to_dst) {
     struct odr_msg rrep;
 
     /* route to the source of the RREQ. This should always exist */
@@ -574,8 +579,7 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
  * the message into host order as well.
  * @Return is the same as recvfrom(2)
  */
-ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
-        struct sockaddr_ll *src) {
+ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg, struct sockaddr_ll *src) {
     char frame[ETH_FRAME_LEN]; /* MAX ethernet frame length 1514 */
     socklen_t srclen;
     ssize_t nread;
@@ -722,8 +726,7 @@ int route_add_incomplete(struct in_addr dstip, struct odr_msg *head) {
  *
  * @return 1 if added/updated a route, 0 if did not update, -1 if error
  */
-int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex,
-        int numhops) {
+int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex, int numhops) {
     struct route_entry *old;
     struct hwa_info *hwa_out;
 

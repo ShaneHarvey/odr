@@ -75,12 +75,11 @@ struct port_node {
 
 void run_odr(void);
 int process_unix(struct api_msg *msg, int size, struct sockaddr_un *src);
-int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac);
-int process_rrep(struct odr_msg *rrep, int srcindex, int forward);
-int process_data(struct odr_msg *data, int force, int srcindex);
+int process_rreq(struct odr_msg *rreq, int srcindex, unsigned char *srcmac, int efficient);
+int process_rrep(struct odr_msg *rrep, int srcindex);
+int process_data(struct odr_msg *data, int srcindex, int force);
 
-int send_rrep(struct odr_msg *rreq, struct route_entry *route,
-        int32_t hops_to_dst);
+int send_rrep(struct odr_msg *rreq, struct route_entry *route, int32_t hops_to_dst);
 int build_send_rreq(struct in_addr dstip, int force, int srcindex);
 int broadcast_rreq(struct odr_msg *rreq, int src_ifindex);
 
@@ -88,8 +87,7 @@ void deliver_data(struct odr_msg *data);
 
 int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
         unsigned char *src_hwaddr, int ifi_index);
-ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
-        struct sockaddr_ll *src);
+ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg, struct sockaddr_ll *src);
 uint64_t usec_ts(void);
 int samemac(unsigned char *mac1, unsigned char *mac2);
 void hton_msg(struct odr_msg *msg);
@@ -101,8 +99,7 @@ void print_mac(unsigned char *mac);
 void print_type(char odr_type);
 /*********************** BEGIN routing table functions ************************/
 int route_add_incomplete(struct in_addr dstip, struct odr_msg *head);
-int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex,
-        int numhops);
+int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex, int numhops);
 void route_entry_update(struct route_entry *r, unsigned char *nxtmac,
         unsigned char *outmac, int if_index, int numhops);
 void route_remove(struct in_addr dest);
