@@ -175,13 +175,12 @@ void run_odr(void) {
             memset(&eh, 0, sizeof(struct ethhdr));
             memset(&llsrc, 0, sizeof(struct sockaddr_ll));
             memset(&recvmsg, 0, sizeof(struct odr_msg));
-            if((nread = recv_frame(&eh, &recvmsg, &llsrc) < 0)) {
+            if((nread = recv_frame(&eh, &recvmsg, &llsrc)) < 0) {
                 /* FAILED */
                 return;
             } else if(nread < ODR_MIN_FRAME) {
                 warn("Received %d byte frame too small for ODR.\n", nread);
             } else {
-                info("Received valid frame TODO: print frame\n");
                 srcindex = llsrc.sll_ifindex;
                 /* Received a valid ODR message */
                 if(recvmsg.srcip.s_addr == odrip.s_addr) {
@@ -197,8 +196,8 @@ void run_odr(void) {
                         route_remove(recvmsg.dstip);
                     }
                     /* add the route back to source with ifindex/ nxtMAC */
-                    if((updated = route_add_complete(eh.h_source,
-                            recvmsg.srcip, srcindex, recvmsg.numhops)) < 0) {
+                    if((updated = route_add_complete(eh.h_source, recvmsg.srcip,
+                            srcindex, recvmsg.numhops)) < 0) {
                         /* failed */
                         return;
                     }
@@ -518,7 +517,7 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
     struct ethhdr *eh = (struct ethhdr *)frame;
     struct sockaddr_ll dest;
     int nsent, size;
-    memset(frame, 0 , ETH_FRAME_LEN);
+    memset(frame, 0, ETH_FRAME_LEN);
     size = ODR_MSG_SIZE(payload);
 
     if(size > ETH_DATA_LEN) {
@@ -538,24 +537,26 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
     ntoh_msg(payload);
 
     /* Initialize sockaddr_ll */
-    memset(&dest, 0, sizeof(dest));
+    memset(&dest, 0, sizeof(struct sockaddr_ll));
     dest.sll_family = AF_PACKET;
     dest.sll_ifindex = ifi_index;
     memcpy(dest.sll_addr, dst_hwaddr, ETH_ALEN);
     dest.sll_halen = ETH_ALEN;
     dest.sll_protocol = htons(ETH_P_ODR);
 
-    printf("Frame source MAC ");
+    printf("Frame ifindex %d source MAC ", ifi_index);
     print_mac(src_hwaddr);
     printf("\n");
     print_frame(eh, payload);
 
     if((nsent = sendto(packsock, frame, size+sizeof(struct ethhdr), 0,
-            (struct sockaddr *)&dest, sizeof(dest))) < 0) {
+            (struct sockaddr *)&dest, sizeof(struct sockaddr_ll))) < 0) {
         error("packet sendto: %s\n", strerror(errno));
         return 0;
     } else {
         debug("Send %d bytes, odr msg size:%d\n", nsent, size);
+        printf("Sent ");
+        print_odrmsg(payload);
     }
     return 1;
 }
@@ -571,6 +572,7 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
     socklen_t srclen;
     ssize_t nread;
 
+    memset(src, 0, sizeof(struct sockaddr_ll));
     srclen = sizeof(struct sockaddr_ll);
     if((nread = recvfrom(packsock, frame, ETH_FRAME_LEN, 0,
             (struct sockaddr *)src, &srclen)) < 0) {
@@ -582,8 +584,20 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
         memcpy(recvmsg, frame + ETH_HLEN, nread - ETH_HLEN);
         /* Convert message from Network to Host order */
         ntoh_msg(recvmsg);
+        printf("Received ");
+        print_odrmsg(recvmsg);
     }
     return nread;
+}
+
+void print_odrmsg(struct odr_msg *msg) {
+    printf("ODR msg: ");
+    print_type(msg->type);
+    printf(" flags: 0x%02hhX\n", msg->flags);
+    printf("src: %s:%d ", inet_ntoa(msg->srcip), msg->srcport);
+    printf("dst: %s:%d\n", inet_ntoa(msg->dstip), msg->dstport);
+    printf("numhops: %"PRId32" broadcastid: %"PRId32" dlen: %"PRIu32"\n",
+            msg->numhops, msg->broadcastid, msg->dlen);
 }
 
 void print_frame(struct ethhdr *eh, struct odr_msg *msg) {
@@ -720,6 +734,9 @@ int route_add_complete(unsigned char *nxtmac, struct in_addr dstip, int ifindex,
             error("malloc failed: %s\n", strerror(errno));
             return -1;
         }
+        /* Init this entry */
+        memset(new, 0, sizeof(struct route_entry));
+        new->dstip.s_addr = dstip.s_addr;
         route_entry_update(new, nxtmac, hwa_out->if_haddr, ifindex, numhops);
         /* add this new route entry to the route table */
         new->head = NULL;

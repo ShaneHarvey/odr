@@ -6,6 +6,7 @@
 #include <time.h>
 #include <net/ethernet.h>
 #include <sys/stat.h>
+#include <inttypes.h>
 
 /* Used as the ethernet frame type */
 #define ETH_P_ODR 0xF31F
@@ -94,6 +95,7 @@ int samemac(unsigned char *mac1, unsigned char *mac2);
 void hton_msg(struct odr_msg *msg);
 void ntoh_msg(struct odr_msg *msg);
 
+void print_odrmsg(struct odr_msg *msg);
 void print_frame(struct ethhdr *eh, struct odr_msg *msg);
 void print_mac(unsigned char *mac);
 void print_type(char odr_type);
