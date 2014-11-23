@@ -530,18 +530,21 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
     memcpy(eh->h_dest, dst_hwaddr, ETH_ALEN);
     memcpy(eh->h_source, src_hwaddr, ETH_ALEN);
     eh->h_proto = htons(ETH_P_ODR);
+
     /* Convert payload into NETWORK byte order */
     hton_msg(payload);
     /* Copy frame data into buffer */
     memcpy(frame + sizeof(struct ethhdr), payload, size);
     /* Convert payload back into HOST byte order */
     ntoh_msg(payload);
+
     /* Initialize sockaddr_ll */
     memset(&dest, 0, sizeof(dest));
     dest.sll_family = AF_PACKET;
     dest.sll_ifindex = ifi_index;
     memcpy(dest.sll_addr, dst_hwaddr, ETH_ALEN);
     dest.sll_halen = ETH_ALEN;
+    dest.sll_protocol = htons(ETH_P_ODR);
 
     printf("Frame source MAC ");
     print_mac(src_hwaddr);
@@ -573,7 +576,7 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
     if((nread = recvfrom(packsock, frame, ETH_FRAME_LEN, 0,
             (struct sockaddr *)src, &srclen)) < 0) {
         error("packet socket recv failed: %s\n", strerror(errno));
-    } else {
+    } else if(nread >= ODR_MIN_FRAME) {
         /* Copy ethernet frame header into eh */
         memcpy(eh, frame, ETH_HLEN);
         /* Copy the frame_data into the odr_msg */
