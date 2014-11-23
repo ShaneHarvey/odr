@@ -63,8 +63,8 @@ void run_time_server(int unix_socket) {
             break;
         }
 
-        info("server at node %s responding to request from %s\n", myhost,
-                chost);
+        info("server at node %s responding to request from %s\n", myhost, chost);
+        debug("recv msg from %s:%d\n", ip, port);
         /* Construct a timestamp */
         if ((ticks = time(NULL)) == ((time_t) - 1)) {
             error("time failed: %s\n", strerror(errno));

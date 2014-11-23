@@ -155,7 +155,10 @@ void run_odr(void) {
                 /* valid API message received */
                 info("ODR received valid message from UNIX socket\n");
                 route_cleanup();
-
+                if(recvmsg.flag) {
+                    /* if FORCE_RREQ then remove_route(dest ip) */
+                    route_remove(recvmsg.ip);
+                }
                 if(!process_unix(&recvmsg, nread, &unaddr)) {
                     error("failed to process UNIX socket message: %s\n",
                             strerror(errno));
@@ -215,7 +218,7 @@ void run_odr(void) {
                             }
                             break;
                         case ODR_DATA:
-                            if(!process_data(&recvmsg, srcindex)) {
+                            if(!process_data(&recvmsg, 0, srcindex)) {
                                 return;
                             }
                             break;
@@ -249,14 +252,14 @@ int process_unix(struct api_msg *msg, int size, struct sockaddr_un *src) {
     data.srcport = sourceport;
     data.dstip.s_addr = msg->ip.s_addr;
     data.dstport = msg->port;
-    data.flags = msg->flag? ODR_FORCE_RREQ : 0;
+    data.flags = 0;
     data.dlen = size - MIN_API_MSG;
     /* copy application data to the ODR DATA message */
     memcpy(data.data, msg->msg, data.dlen);
 
     /* Set numhops to 0 */
     data.numhops = 0;
-    return process_data(&data, -1); /* -1 because we are the source */
+    return process_data(&data, msg->flag, -1); /* -1 because we are the source */
 }
 
 /*
@@ -350,8 +353,9 @@ int process_rrep(struct odr_msg *rrep, int srcindex, int forward) {
 /*
  * @param data    Pointer to a valid DATA type odr_msg
  * @param srcindex Link layer source interface of the RREQ in HOST order
+ * @param force    True to force RREQ
  */
-int process_data(struct odr_msg *data, int srcindex) {
+int process_data(struct odr_msg *data, int force, int srcindex) {
     struct route_entry *dstroute;
     /* increment the number of hops to the destination */
     data->numhops++;
@@ -365,7 +369,7 @@ int process_data(struct odr_msg *data, int srcindex) {
     }else if(dstroute == NULL) {
         /* No route exists, send RREQ for msg.dstip, and buffer RREP */
         return route_add_incomplete(data->dstip, data) &&
-                build_send_rreq(data->dstip, data->flags, srcindex);
+                build_send_rreq(data->dstip, force, srcindex);
     } else if(dstroute->complete) {
         /* Forward msg along the route */
         return send_frame(data, dstroute->nxtmac, dstroute->outmac,
@@ -393,7 +397,7 @@ void deliver_data(struct odr_msg *data) {
     } else {
         struct api_msg am;
         memset(&am, 0, sizeof(struct api_msg));
-        am.ip.s_addr = data->dstip.s_addr; /* The source ip of the message */
+        am.ip.s_addr = data->srcip.s_addr; /* The source ip of the message */
         am.port = data->srcport;           /* The source port */
         memcpy(am.msg, data->data, data->dlen); /* The message */
         /* Send the message to the application */
@@ -401,7 +405,11 @@ void deliver_data(struct odr_msg *data) {
                 pn->unaddr.sun_path, inet_ntoa(am.ip), am.port);
         if(sendto(unixsock, &am, MIN_API_MSG + data->dlen, 0,
                 (struct sockaddr *)&pn->unaddr, sizeof(struct sockaddr_un)) < 0) {
-            error("UNIX socket sendto failed: %s\n", strerror(errno));
+            if(errno == ENOENT) {
+                warn("No application with socket file %s\n", pn->unaddr.sun_path);
+            } else {
+                error("UNIX socket sendto failed: %s\n", strerror(errno));
+            }
             /* Set this port node ts to 0 so it will be stale */
             pn->ts = 0;
         } else {
@@ -555,7 +563,7 @@ int send_frame(struct odr_msg *payload, unsigned char *dst_hwaddr,
         return 0;
     } else {
         debug("Send %d bytes, odr msg size:%d\n", nsent, size);
-        printf("Sent ");
+        info("Sent ");
         print_odrmsg(payload);
     }
     return 1;
@@ -584,7 +592,7 @@ ssize_t recv_frame(struct ethhdr *eh, struct odr_msg *recvmsg,
         memcpy(recvmsg, frame + ETH_HLEN, nread - ETH_HLEN);
         /* Convert message from Network to Host order */
         ntoh_msg(recvmsg);
-        printf("Received ");
+        info("Received ");
         print_odrmsg(recvmsg);
     }
     return nread;
