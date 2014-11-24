@@ -193,7 +193,7 @@ void run_odr(void) {
                     info("ODR received packet from self.\n");
                 } else {
                     /* valid API message received */
-                    info("ODR received valid packet from packet socket\n");
+                    debug("ODR received valid packet from packet socket\n");
                     /* Update route table */
                     route_cleanup();
                     if(recvmsg.flags & ODR_FORCE_RREQ) {
@@ -206,7 +206,8 @@ void run_odr(void) {
                         /* failed */
                         return;
                     }
-                    info("ODR routing table %s \n", updated? "updated": "did not update");
+                    debug("ODR routing table %s \n", updated? "updated": "did "
+                            "not update");
                     /* proces ODR message */
                     switch(recvmsg.type) {
                         case ODR_RREQ:
