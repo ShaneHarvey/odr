@@ -3,10 +3,31 @@ odr
 
 Network Programming Assignment 3
 
+Shane Harvey 108272239
+Paul Campbell 108481554
+
+###ODR
+
+To build
+```bash
+$ make
 ```
-ODR
+To run ODR
+```bash
+$ sudo ./ODR_cse533-14 120
+```
+To run server
+```bash
+$ ./server_cse533-14
+```
+To run client
+```bash
+$ ./client_cse533-14
+```
+
+It evens works with a staleness argument of 0 seconds :)
+
 interface list
-    get_hw_addrs()
     remove eth0 and lo interfaces from the list
 
 routing table
