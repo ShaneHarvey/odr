@@ -135,6 +135,9 @@ void run_odr(void) {
             return;
         }
 
+        /* Cleanup stale port nodes */
+        port_cleanup();
+
         /* UNIX socket is readable */
         if(FD_ISSET(unixsock, &rset)) {
             struct sockaddr_un unaddr;
@@ -227,8 +230,6 @@ void run_odr(void) {
                 }
             }
         }
-        /* Cleanup stale port nodes */
-        port_cleanup();
     }
 }
 
