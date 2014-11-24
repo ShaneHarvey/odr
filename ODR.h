@@ -12,7 +12,8 @@
 #define ETH_P_ODR 0xF31F
 
 #define ODR_MIN_STALE 0.0
-#define ODR_MAX_STALE 86400.0
+/* One year */
+#define ODR_MAX_STALE 31536000.0
 
 #define ODR_MAX_DATA 1470
 #define ODR_MIN_FRAME 30
@@ -113,11 +114,14 @@ int msgqueue_add(struct route_entry *route, struct odr_msg *msg);
 /************************ END message queue functions *************************/
 
 /************************* BEGIN Port Table functions *************************/
+/* 20 Second Allocation time */
+#define PORT_ENTRY_TTL 20000000ULL
 struct port_node *init_port_table(void);
 struct port_node *port_searchbyport(int port);
 struct port_node *port_searchbyaddr(struct sockaddr_un *unaddr);
 int port_add(struct sockaddr_un *addr);
 void port_free(void);
+void port_cleanup(void);
 /************************** END Port Table functions **************************/
 
 /********************* BEGIN Previous RREQ list functions *********************/

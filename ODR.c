@@ -227,6 +227,8 @@ void run_odr(void) {
                 }
             }
         }
+        /* Cleanup stale port nodes */
+        port_cleanup();
     }
 }
 
@@ -244,6 +246,8 @@ int process_unix(struct api_msg *msg, int size, struct sockaddr_un *src) {
     } else {
         /*  Application already has port */
         sourceport = pn->port;
+        /* Update port entry */
+        pn->ts = usec_ts();
     }
     memset(&data, 0, sizeof(struct odr_msg));
     data.type = ODR_DATA;
@@ -1018,6 +1022,8 @@ int port_add(struct sockaddr_un *addr) {
     memcpy(&newnode->unaddr, addr, sizeof(struct sockaddr_un));
     newnode->port = 0;
     newnode->next = NULL;
+    newnode->ts = usec_ts();
+    newnode->permanent = 0;
 
     /* Search for the lowest unused port and insert */
     for(prev = NULL, cur = porthead; cur != NULL; prev = cur, cur = cur->next,
@@ -1050,6 +1056,39 @@ void port_free(void) {
         tmp = porthead->next;
         free(porthead);
         porthead = tmp;
+    }
+}
+
+/*
+ * Removes all stale complete entries in the routing table.
+ */
+void port_cleanup(void) {
+    uint64_t ts;
+    struct port_node *cur, *next, *prev;
+
+    /* get the current usec timestamp */
+    ts = usec_ts();
+
+    prev = NULL;
+    cur = porthead;
+    while(cur != NULL) {
+        next = cur->next;
+        /* Cleanup */
+        if(ts - cur->ts > PORT_ENTRY_TTL && !cur->permanent) {
+            /* remove stale port node */
+            info("Removed stale port entry for %s, port %d\n",
+                    cur->unaddr.sun_path, cur->port);
+            free(cur);
+            if(prev == NULL) {
+                /* we are removing the head */
+                porthead = next;
+            } else {
+                prev->next = next;
+            }
+        } else {
+            prev = cur;
+        }
+        cur = next;
     }
 }
 
